@@ -1,7 +1,10 @@
 .versionpicker {
   position: absolute;
   top: calc(100% + 8px);
-  right: 0;
+  /* Open rightward from the version button: the button sits near the
+     window's left edge, so a right-anchored panel would run off-screen. */
+  left: 0;
+  right: auto;
   width: 340px;
   max-height: 480px;
   background: var(--color-surface);

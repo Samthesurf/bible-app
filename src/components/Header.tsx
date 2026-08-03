@@ -6,7 +6,6 @@ import './Header.css';
 const TABS = [
   { id: 'bible', label: 'Bible', active: true },
   { id: 'plans', label: 'Plans', active: false },
-  { id: 'videos', label: 'Videos', active: false },
 ];
 
 export default function Header(): React.ReactElement {
@@ -37,9 +36,6 @@ export default function Header(): React.ReactElement {
       </div>
 
       <div className="header__right">
-        <button type="button" className="header__cta">
-          Get the app
-        </button>
         <button type="button" className="header__avatar" aria-label="Profile">
           <UserIcon size={18} />
         </button>
