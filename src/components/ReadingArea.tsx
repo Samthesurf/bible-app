@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useBible } from '../context/BibleContext';
 import { useChapter } from '../hooks/useChapter';
 import { useKeyboardNav } from '../hooks/useKeyboardNav';
 import ChapterView from './ChapterView';
 import ParallelView from './ParallelView';
 import NavArrow from './NavArrow';
+import SelectionTTS from './SelectionTTS';
 import './ReadingArea.css';
 
 /**
@@ -18,6 +19,7 @@ export default function ReadingArea(): React.ReactElement {
 
   const [ttsAvailable, setTtsAvailable] = useState(false);
   const [playingVerse, setPlayingVerse] = useState<number | null>(null);
+  const readingRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,7 +46,8 @@ export default function ReadingArea(): React.ReactElement {
   }, []);
 
   return (
-    <main className="reading-area">
+    <main className="reading-area" ref={readingRef}>
+      <SelectionTTS containerRef={readingRef} ttsAvailable={ttsAvailable} />
       <NavArrow direction="prev" onClick={prevChapter} disabled={atStart} />
       <NavArrow direction="next" onClick={nextChapter} disabled={atEnd} />
 
