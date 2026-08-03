@@ -28,6 +28,9 @@ export class KokoroTTSEngine implements TTSEngine {
   private currentProcess: ChildProcess | null = null;
   private readonly tempDir: string;
   private available: boolean | null = null;
+  /** Prefetched audio cache: hash(text) -> temp mp3 path. */
+  private readonly prefetchCache = new Map<string, string>();
+  private prefetchInFlight = false;
 
   constructor(config: KokoroConfig) {
     this.apiKey = config.apiKey;
@@ -56,18 +59,22 @@ export class KokoroTTSEngine implements TTSEngine {
     this.emitState({ status: 'speaking', text });
 
     try {
-      // 1. Call OpenRouter
-      const audioBuffer = await this.callAPI(text, voice, speed);
+      // 1. Reuse a prefetched file if one exists (pipeline), else fetch.
+      const key = this.hashKey(text, voice, speed);
+      let tempFile = this.prefetchCache.get(key) ?? null;
+      if (tempFile) {
+        this.prefetchCache.delete(key);
+      } else {
+        const audioBuffer = await this.callAPI(text, voice, speed);
+        await fsp.mkdir(this.tempDir, { recursive: true });
+        tempFile = path.join(this.tempDir, `tts-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp3`);
+        await fsp.writeFile(tempFile, audioBuffer);
+      }
 
-      // 2. Write to a unique temp file
-      await fsp.mkdir(this.tempDir, { recursive: true });
-      const tempFile = path.join(this.tempDir, `tts-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp3`);
-      await fsp.writeFile(tempFile, audioBuffer);
-
-      // 3. Play via mpv (headless)
+      // 2. Play via mpv (headless)
       await this.playAudio(tempFile);
 
-      // 4. Cleanup
+      // 3. Cleanup
       await fsp.unlink(tempFile).catch(() => {});
 
       this.emitState({ status: 'idle' });
@@ -82,12 +89,53 @@ export class KokoroTTSEngine implements TTSEngine {
     }
   }
 
+  /**
+   * Fetch the audio for `text` ahead of time and cache it, so the next
+   * speak() for the same text plays immediately (near-zero latency between
+   * verses). Fire-and-forget; failures are ignored.
+   */
+  async prefetch(text: string, options?: TTSOptions): Promise<void> {
+    if (!(await this.isAvailable())) return;
+    if (this.prefetchInFlight) return;
+    const voice = options?.voice ?? this.defaultVoice;
+    const speed = options?.rate ?? this.defaultSpeed;
+    const key = this.hashKey(text, voice, speed);
+    if (this.prefetchCache.has(key)) return;
+
+    this.prefetchInFlight = true;
+    try {
+      const audioBuffer = await this.callAPI(text, voice, speed);
+      await fsp.mkdir(this.tempDir, { recursive: true });
+      const tempFile = path.join(this.tempDir, `pre-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp3`);
+      await fsp.writeFile(tempFile, audioBuffer);
+      // Keep the cache small: drop the oldest entry if it grows.
+      if (this.prefetchCache.size >= 2) {
+        const oldest = this.prefetchCache.keys().next().value;
+        if (oldest) {
+          const p = this.prefetchCache.get(oldest);
+          this.prefetchCache.delete(oldest);
+          if (p) await fsp.unlink(p).catch(() => {});
+        }
+      }
+      this.prefetchCache.set(key, tempFile);
+    } catch {
+      // prefetch is best-effort
+    } finally {
+      this.prefetchInFlight = false;
+    }
+  }
+
+  private hashKey(text: string, voice: string, speed: number): string {
+    return `${voice}|${speed}|${text}`;
+  }
+
   async stop(): Promise<void> {
     if (this.currentProcess) {
       const proc = this.currentProcess;
       this.currentProcess = null;
       proc.kill('SIGTERM');
     }
+    this.clearPrefetch();
     this.emitState({ status: 'idle' });
   }
 
@@ -103,11 +151,23 @@ export class KokoroTTSEngine implements TTSEngine {
 
   /** Clean up leftover temp files (called on app quit). */
   cleanup(): void {
+    this.clearPrefetch();
     try {
       fs.rmSync(this.tempDir, { recursive: true, force: true });
     } catch {
       // ignore
     }
+  }
+
+  private clearPrefetch(): void {
+    for (const p of this.prefetchCache.values()) {
+      try {
+        fs.unlinkSync(p);
+      } catch {
+        // ignore
+      }
+    }
+    this.prefetchCache.clear();
   }
 
   private emitState(state: TTSState): void {

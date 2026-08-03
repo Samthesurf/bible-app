@@ -6,24 +6,55 @@ import { BibleLoader } from './bible-loader';
 import { JsonStore } from './store';
 import { StubTTSEngine, type TTSEngine } from './tts-stub';
 import { KokoroTTSEngine } from './tts-kokoro';
+import { LocalKokoroTTSEngine } from './tts-local';
+import { HybridTTSEngine } from './tts-hybrid';
 
 const isDev = !app.isPackaged;
 let mainWindow: BrowserWindow | null = null;
 
 // ---------------------------------------------------------------------------
-// TTS wiring point: replace StubTTSEngine with KokoroTTSEngine when the
-// OpenRouter API key is available.  See electron/tts-kokoro.ts.
+// TTS wiring: prefer local Kokoro (free, offline), else OpenRouter Kokoro,
+// else the stub.  See electron/tts-local.ts and electron/tts-kokoro.ts.
 // ---------------------------------------------------------------------------
 const ttsEngine: TTSEngine = createTTSEngine();
 
 function createTTSEngine(): TTSEngine {
+  const local = new LocalKokoroTTSEngine({});
+  const hasLocal = fs.existsSync(localPythonPath()) && fs.existsSync(localServicePath());
+
+  // 1) Hybrid: OpenRouter live playback + background local cache warming.
+  //    First pass costs a few cents; repeat readings play from the free,
+  //    instant local cache. Best of both worlds.
   const apiKey = resolveOpenRouterKey();
-  if (!apiKey || apiKey.length < 10) {
-    console.warn('[TTS] No OpenRouter API key found. TTS disabled.');
-    return new StubTTSEngine();
+  if (apiKey && apiKey.length >= 10 && hasLocal) {
+    console.log('[TTS] Hybrid engine: OpenRouter live + local cache warming.');
+    return new HybridTTSEngine(new KokoroTTSEngine({ apiKey }), local);
   }
-  console.log('[TTS] Kokoro TTS engine initialized.');
-  return new KokoroTTSEngine({ apiKey });
+
+  // 2) OpenRouter only (fast, but no local cache available).
+  if (apiKey && apiKey.length >= 10) {
+    console.log('[TTS] Kokoro TTS engine initialized (OpenRouter).');
+    return new KokoroTTSEngine({ apiKey });
+  }
+
+  // 3) Local only (free, offline, but slow on this CPU).
+  if (hasLocal) {
+    console.log('[TTS] Using local Kokoro engine (slow, offline).');
+    return local;
+  }
+
+  // 4) Stub.
+  console.warn('[TTS] No local Kokoro or OpenRouter key found. TTS disabled.');
+  return new StubTTSEngine();
+}
+
+function localPythonPath(): string {
+  if (app.isPackaged) return path.join(process.resourcesPath, 'tts-venv', 'bin', 'python');
+  return path.join(app.getAppPath(), 'tts-venv', 'bin', 'python');
+}
+function localServicePath(): string {
+  if (app.isPackaged) return path.join(process.resourcesPath, 'electron', 'kokoro_service.py');
+  return path.join(app.getAppPath(), 'electron', 'kokoro_service.py');
 }
 
 /** Resolve the OpenRouter API key: env var > ~/.hermes/.env > null. */
@@ -160,6 +191,11 @@ function registerIpc(): void {
 
   ipcMain.handle('tts:is-available', () => ttsEngine.isAvailable());
   ipcMain.handle('tts:speak', (_event, payload: { text: string }) => ttsEngine.speak(payload.text));
+  ipcMain.handle('tts:prefetch', (_event, payload: { text: string }) => {
+    if ('prefetch' in ttsEngine) {
+      void (ttsEngine as unknown as { prefetch: (t: string) => Promise<void> }).prefetch(payload.text);
+    }
+  });
   ipcMain.handle('tts:stop', () => ttsEngine.stop());
   ipcMain.handle('tts:update-config', (_event, payload: { voice?: string; speed?: number }) => {
     if ('updateConfig' in ttsEngine) {

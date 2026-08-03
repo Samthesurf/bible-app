@@ -101,6 +101,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
       for (let i = 0; i < verses.length; i += 1) {
         if (stopFlag.current) break;
         setVerseIndex(i);
+        // Prefetch the next verse while this one plays → near-zero gap.
+        if (i + 1 < verses.length) {
+          void window.electronAPI.tts.prefetch(verses[i + 1]);
+        }
         try {
           await speakWithRetry(verses[i]);
         } catch (err) {

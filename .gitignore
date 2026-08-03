@@ -10,6 +10,10 @@ release/
 # also includes copyrighted translations — keep out of version control)
 bibles/
 
+# Local TTS (Python venv + downloaded model)
+tts-venv/
+~/.local/share/bible-app-kokoro/
+
 # Logs & OS noise
 *.log
 .DS_Store

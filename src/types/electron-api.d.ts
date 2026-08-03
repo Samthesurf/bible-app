@@ -13,6 +13,7 @@ declare global {
       tts: {
         isAvailable(): Promise<boolean>;
         speak(text: string): Promise<void>;
+        prefetch(text: string): Promise<void>;
         stop(): Promise<void>;
         updateConfig(voice?: string, speed?: number): Promise<void>;
         onStateChange(callback: (state: TTSState) => void): () => void;

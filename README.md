@@ -54,14 +54,23 @@ The packaged app loads bibles from `<app>/resources/bibles`
 
 ## Wiring up text-to-speech
 
-The TTS layer is a replaceable adapter behind a fixed IPC contract:
+**Hybrid engine (default):** plays each verse live via OpenRouter's Kokoro
+(`hexgrad/kokoro-82m`) while a **local Kokoro-onnx** model synthesizes the same
+verse in the background into a persistent cache (`~/.cache/bible-app-kokoro/`).
+The next time that verse is played it's read from the local cache — instant and
+free. First pass through a passage costs a few cents of OpenRouter credits;
+repeat readings are entirely offline. Falls back to OpenRouter-only, then
+local-only, then a stub as prerequisites are missing.
 
-1. Implement the `TTSEngine` interface in `electron/tts-stub.ts`
-   (`isAvailable()`, `speak(text, options?)`, `stop()`, `onStateChange()`).
-2. Swap it in `electron/main.ts`:
-   `const ttsEngine: TTSEngine = new StubTTSEngine();` → your engine.
-3. That's it — the toolbar button, per-verse play icons, playing state and
-   "not configured" toast all follow automatically via `tts:*` IPC channels.
+- **OpenRouter** needs an API key (auto-resolved from `~/.hermes/.env` or the
+  `OPENROUTER_API_KEY` env var).
+- **Local Kokoro** needs a Python venv at `tts-venv/` with `kokoro-onnx` and the
+  model in `~/.local/share/bible-app-kokoro/` (see `electron/kokoro_service.py`).
+  Note: on modest CPUs local synthesis is ~15-50x slower than the API, which is
+  why it's used as a background cache warmer rather than the live path.
+
+The `TTSEngine` interface (`electron/tts-stub.ts`) stays the contract; swap
+engines in `electron/main.ts` `createTTSEngine()`.
 
 ## Architecture
 
