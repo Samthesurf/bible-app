@@ -1,0 +1,128 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 0 24px;
+  height: 64px;
+  background: var(--color-header-bg);
+  border-bottom: 1px solid var(--color-border);
+  z-index: 50;
+}
+
+.header__left {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  min-width: 0;
+}
+
+.header__logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.header__logo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+.header__logo-text {
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+
+.header__nav {
+  display: flex;
+  gap: 4px;
+}
+
+.header__tab {
+  background: none;
+  border: none;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-lg);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.header__tab:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.header__tab--active {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.header__center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  min-width: 120px;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.header__right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header__cta {
+  background: var(--color-text);
+  color: var(--color-bg);
+  border: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 8px 18px;
+  border-radius: var(--radius-lg);
+  white-space: nowrap;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.header__cta:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
+}
+
+.header__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+}
+
+.header__avatar:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+/* Narrow windows: hide nav tabs & CTA, keep search */
+@media (max-width: 900px) {
+  .header__nav,
+  .header__cta {
+    display: none;
+  }
+  .header {
+    padding: 0 16px;
+  }
+}

@@ -1,0 +1,85 @@
+.tts-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 300px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  z-index: 300;
+}
+
+.tts-popover__group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tts-popover__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tts-popover__value {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.tts-popover__slider {
+  width: 100%;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.tts-popover__themes {
+  display: flex;
+  gap: 10px;
+}
+
+.tts-popover__theme {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.tts-popover__theme:hover {
+  transform: scale(1.08);
+}
+
+.tts-popover__theme--active {
+  border-color: var(--color-accent);
+}
+
+.tts-popover__theme--light {
+  background: #ffffff;
+}
+
+.tts-popover__theme--sepia {
+  background: #f5f0e8;
+}
+
+.tts-popover__theme--dark {
+  background: #1e1e1e;
+  color: #e4e4e7;
+}
+
+@media (max-width: 640px) {
+  .tts-popover {
+    width: min(90vw, 300px);
+  }
+}

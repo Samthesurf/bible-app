@@ -1,0 +1,63 @@
+.verse {
+  position: relative;
+  margin: 0 0 1.15em;
+  line-height: var(--line-height-body);
+  font-size: var(--font-size-body);
+  font-family: var(--font-body);
+  color: var(--color-text);
+  text-align: left;
+}
+
+.verse--playing {
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  margin-left: -8px;
+  margin-right: -8px;
+}
+
+.verse__number {
+  font-family: var(--font-ui);
+  font-size: var(--font-size-verse-num);
+  font-weight: 700;
+  color: var(--color-verse-number);
+  vertical-align: super;
+  margin-right: 4px;
+  user-select: none;
+}
+
+.verse__text {
+  word-break: break-word;
+}
+
+.verse__play {
+  position: absolute;
+  left: -44px;
+  top: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-accent);
+  box-shadow: var(--shadow-arrow);
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+
+.verse__play:hover {
+  transform: scale(1.12);
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+/* On narrow windows keep the play button in-flow so it never clips */
+@media (max-width: 760px) {
+  .verse__play {
+    position: static;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+}

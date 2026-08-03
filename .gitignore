@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+dist-electron/
+release/
+
+# Bible data (204 MB, regenerable with `python3 build_bibles.py`;
+# also includes copyrighted translations — keep out of version control)
+bibles/
+
+# Logs & OS noise
+*.log
+.DS_Store
+Thumbs.db

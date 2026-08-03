@@ -1,0 +1,20 @@
+appId: com.samuelsurf.bibleapp
+productName: Bible App
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**
+  - dist-electron/**
+  - package.json
+extraResources:
+  - from: bibles
+    to: bibles
+    filter:
+      - "**/*.json"
+linux:
+  target:
+    - AppImage
+  category: Education
+  icon: build/icon.png
+npmRebuild: false

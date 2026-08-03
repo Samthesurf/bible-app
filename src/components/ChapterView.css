@@ -1,0 +1,30 @@
+.chapter-view {
+  max-width: var(--reading-max-width);
+  margin: 0 auto;
+  padding: var(--reading-padding-y) var(--reading-padding-x);
+  font-family: var(--font-body);
+}
+
+.chapter-view__title h1 {
+  font-size: 1.5em;
+  font-weight: 700;
+  margin: 0 0 1.6em;
+  color: var(--color-text);
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+.chapter-view__verses {
+  text-align: left;
+}
+
+/* Parallel columns get tighter padding */
+.parallel-column .chapter-view {
+  max-width: none;
+  padding: 28px 32px;
+}
+
+.parallel-column .chapter-view__title h1 {
+  font-size: 1.25em;
+  margin-bottom: 1.2em;
+}

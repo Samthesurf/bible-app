@@ -1,0 +1,17 @@
+.tts-btn--disabled {
+  opacity: 0.45;
+}
+
+.tts-btn--speaking {
+  animation: tts-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes tts-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--color-accent-soft);
+  }
+  50% {
+    box-shadow: 0 0 0 6px var(--color-accent-soft);
+  }
+}
