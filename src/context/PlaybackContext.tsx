@@ -101,9 +101,12 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
       for (let i = 0; i < verses.length; i += 1) {
         if (stopFlag.current) break;
         setVerseIndex(i);
-        // Prefetch the next verse while this one plays → near-zero gap.
-        if (i + 1 < verses.length) {
-          void window.electronAPI.tts.prefetch(verses[i + 1]);
+        // Prefetch the next 3 verses while this one plays, so the window is
+        // always filled: verse i plays while i+1..i+3 load. The engine queues
+        // and dedups, so re-firing is safe.
+        const ahead = Math.min(3, verses.length - i - 1);
+        for (let j = 1; j <= ahead; j += 1) {
+          void window.electronAPI.tts.prefetch(verses[i + j]);
         }
         try {
           await speakWithRetry(verses[i]);

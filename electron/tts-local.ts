@@ -78,13 +78,20 @@ export class LocalKokoroTTSEngine implements TTSEngine {
   private startService(): Promise<ChildProcess | null> {
     if (this.service && this.service.exitCode === null) return Promise.resolve(this.service);
     return new Promise((resolve) => {
-      // Spawn with the inherited environment. The local venv is built on the
-      // Hermes runtime python and relies on the inherited site-packages to
-      // resolve numpy/onnxruntime (they live in the Hermes venv, not the
-      // local venv). A clean env / -E would break it. This matches how the
-      // dev-mode service is run.
-      const svc = spawn(this.pythonPath, ['-u', this.servicePath], {
+      // Spawn with a clean environment + -E so the venv uses ONLY its own
+      // site-packages. The venv at ~/.local/share/bible-app-kokoro/tts-venv
+      // is fully self-contained (numpy/onnxruntime/kokoro all installed
+      // into it), so it does not need any inherited PYTHONPATH/VIRTUAL_ENV.
+      // A leak from e.g. a Hermes shell session would otherwise shadow it
+      // with an incompatible-ABI numpy.
+      const cleanEnv: NodeJS.ProcessEnv = { ...process.env };
+      delete cleanEnv.PYTHONPATH;
+      delete cleanEnv.VIRTUAL_ENV;
+      delete cleanEnv.PYTHONHOME;
+      delete cleanEnv.PYTHONSTARTUP;
+      const svc = spawn(this.pythonPath, ['-u', '-E', this.servicePath], {
         stdio: ['pipe', 'pipe', 'inherit'],
+        env: cleanEnv,
       });
       this.service = svc;
       svc.stdout?.setEncoding('utf8');

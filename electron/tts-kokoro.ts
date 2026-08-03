@@ -31,6 +31,10 @@ export class KokoroTTSEngine implements TTSEngine {
   /** Prefetched audio cache: hash(text) -> temp mp3 path. */
   private readonly prefetchCache = new Map<string, string>();
   private prefetchInFlight = false;
+  private readonly prefetchQueue: { text: string; voice: string; speed: number; key: string }[] = [];
+  private readonly prefetchQueued = new Set<string>();
+  /** Max entries kept in the prefetch cache (3-ahead window + slack). */
+  private static readonly PREFETCH_MAX = 6;
 
   constructor(config: KokoroConfig) {
     this.apiKey = config.apiKey;
@@ -92,34 +96,48 @@ export class KokoroTTSEngine implements TTSEngine {
   /**
    * Fetch the audio for `text` ahead of time and cache it, so the next
    * speak() for the same text plays immediately (near-zero latency between
-   * verses). Fire-and-forget; failures are ignored.
+   * verses). Requests queue up (multiple verses ahead) and drain in order;
+   * failures are best-effort.
    */
   async prefetch(text: string, options?: TTSOptions): Promise<void> {
     if (!(await this.isAvailable())) return;
-    if (this.prefetchInFlight) return;
     const voice = options?.voice ?? this.defaultVoice;
     const speed = options?.rate ?? this.defaultSpeed;
     const key = this.hashKey(text, voice, speed);
-    if (this.prefetchCache.has(key)) return;
+    if (this.prefetchCache.has(key)) return; // already fetched
+    if (this.prefetchQueued.has(key)) return; // already queued
+    this.prefetchQueued.add(key);
+    this.prefetchQueue.push({ text, voice, speed, key });
+    void this.drainPrefetch();
+  }
 
+  /** Process the prefetch queue sequentially. */
+  private async drainPrefetch(): Promise<void> {
+    if (this.prefetchInFlight) return;
     this.prefetchInFlight = true;
     try {
-      const audioBuffer = await this.callAPI(text, voice, speed);
-      await fsp.mkdir(this.tempDir, { recursive: true });
-      const tempFile = path.join(this.tempDir, `pre-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp3`);
-      await fsp.writeFile(tempFile, audioBuffer);
-      // Keep the cache small: drop the oldest entry if it grows.
-      if (this.prefetchCache.size >= 2) {
-        const oldest = this.prefetchCache.keys().next().value;
-        if (oldest) {
-          const p = this.prefetchCache.get(oldest);
-          this.prefetchCache.delete(oldest);
-          if (p) await fsp.unlink(p).catch(() => {});
+      while (this.prefetchQueue.length > 0) {
+        const job = this.prefetchQueue.shift();
+        if (!job) break;
+        this.prefetchQueued.delete(job.key);
+        try {
+          const audioBuffer = await this.callAPI(job.text, job.voice, job.speed);
+          await fsp.mkdir(this.tempDir, { recursive: true });
+          const tempFile = path.join(this.tempDir, `pre-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp3`);
+          await fsp.writeFile(tempFile, audioBuffer);
+          // Keep the sliding window small: evict oldest entries if over cap.
+          while (this.prefetchCache.size >= KokoroTTSEngine.PREFETCH_MAX) {
+            const oldest = this.prefetchCache.keys().next().value;
+            if (!oldest) break;
+            const p = this.prefetchCache.get(oldest);
+            this.prefetchCache.delete(oldest);
+            if (p) await fsp.unlink(p).catch(() => {});
+          }
+          this.prefetchCache.set(job.key, tempFile);
+        } catch {
+          // prefetch is best-effort; a later speak() will fetch normally
         }
       }
-      this.prefetchCache.set(key, tempFile);
-    } catch {
-      // prefetch is best-effort
     } finally {
       this.prefetchInFlight = false;
     }

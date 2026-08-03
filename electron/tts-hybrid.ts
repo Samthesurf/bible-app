@@ -80,9 +80,10 @@ export class HybridTTSEngine implements TTSEngine {
     // If the cache already has it, nothing to do — playback will be instant.
     if (this.local.isCached(text, voice, speed)) return;
 
-    // Warm the local cache AND prefetch the OpenRouter audio for instant
-    // live playback (both happen while the current verse is playing).
-    void this.local.generateAndCache(text, voice, speed);
+    // Prefetch the OpenRouter audio for instant live playback. (Local
+    // warming is intentionally NOT done here: it would flood the slow
+    // single-threaded local service with 3-ahead jobs every verse. The
+    // current verse is warmed in speak() instead.)
     await this.openrouter.prefetch(text, options);
   }
 
