@@ -50,7 +50,10 @@ export class LocalKokoroTTSEngine implements TTSEngine {
   }
 
   private resolvePythonPath(): string {
-    // Local venv lives next to the app (dev) or in resources (packaged).
+    // User-level venv (shared by dev + packaged) preferred, then the project
+    // (dev) or bundled resources (packaged).
+    const userPath = path.join(app.getPath('home'), '.local', 'share', 'bible-app-kokoro', 'tts-venv', 'bin', 'python');
+    if (fs.existsSync(userPath)) return userPath;
     if (app.isPackaged) {
       return path.join(process.resourcesPath, 'tts-venv', 'bin', 'python');
     }

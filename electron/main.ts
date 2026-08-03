@@ -49,10 +49,15 @@ function createTTSEngine(): TTSEngine {
 }
 
 function localPythonPath(): string {
+  // User-level (shared by dev + packaged). The venv lives here so the
+  // packaged app can find it without bundling 100MB+ into the binary.
+  const userPath = path.join(app.getPath('home'), '.local', 'share', 'bible-app-kokoro', 'tts-venv', 'bin', 'python');
+  if (fs.existsSync(userPath)) return userPath;
   if (app.isPackaged) return path.join(process.resourcesPath, 'tts-venv', 'bin', 'python');
   return path.join(app.getAppPath(), 'tts-venv', 'bin', 'python');
 }
 function localServicePath(): string {
+  // The service script is bundled inside app.asar (dev) or resources (packaged).
   if (app.isPackaged) return path.join(process.resourcesPath, 'electron', 'kokoro_service.py');
   return path.join(app.getAppPath(), 'electron', 'kokoro_service.py');
 }

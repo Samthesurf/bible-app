@@ -12,6 +12,8 @@ extraResources:
     to: bibles
     filter:
       - "**/*.json"
+  - from: electron/kokoro_service.py
+    to: electron/kokoro_service.py
 linux:
   target:
     - AppImage
