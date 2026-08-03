@@ -78,6 +78,11 @@ export class LocalKokoroTTSEngine implements TTSEngine {
   private startService(): Promise<ChildProcess | null> {
     if (this.service && this.service.exitCode === null) return Promise.resolve(this.service);
     return new Promise((resolve) => {
+      // Spawn with the inherited environment. The local venv is built on the
+      // Hermes runtime python and relies on the inherited site-packages to
+      // resolve numpy/onnxruntime (they live in the Hermes venv, not the
+      // local venv). A clean env / -E would break it. This matches how the
+      // dev-mode service is run.
       const svc = spawn(this.pythonPath, ['-u', this.servicePath], {
         stdio: ['pipe', 'pipe', 'inherit'],
       });
