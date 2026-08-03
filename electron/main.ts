@@ -1,18 +1,48 @@
 import { app, BrowserWindow, ipcMain, session, shell } from 'electron';
 import fs from 'fs';
 import path from 'path';
+import { homedir } from 'os';
 import { BibleLoader } from './bible-loader';
 import { JsonStore } from './store';
 import { StubTTSEngine, type TTSEngine } from './tts-stub';
+import { KokoroTTSEngine } from './tts-kokoro';
 
 const isDev = !app.isPackaged;
 let mainWindow: BrowserWindow | null = null;
 
 // ---------------------------------------------------------------------------
-// TTS wiring point: replace StubTTSEngine with a real implementation later.
-// See electron/tts-stub.ts for the TTSEngine interface.
+// TTS wiring point: replace StubTTSEngine with KokoroTTSEngine when the
+// OpenRouter API key is available.  See electron/tts-kokoro.ts.
 // ---------------------------------------------------------------------------
-const ttsEngine: TTSEngine = new StubTTSEngine();
+const ttsEngine: TTSEngine = createTTSEngine();
+
+function createTTSEngine(): TTSEngine {
+  const apiKey = resolveOpenRouterKey();
+  if (!apiKey || apiKey.length < 10) {
+    console.warn('[TTS] No OpenRouter API key found. TTS disabled.');
+    return new StubTTSEngine();
+  }
+  console.log('[TTS] Kokoro TTS engine initialized.');
+  return new KokoroTTSEngine({ apiKey });
+}
+
+/** Resolve the OpenRouter API key: env var > ~/.hermes/.env > null. */
+function resolveOpenRouterKey(): string | null {
+  if (process.env.OPENROUTER_API_KEY) {
+    return process.env.OPENROUTER_API_KEY;
+  }
+  try {
+    const envPath = path.join(homedir(), '.hermes', '.env');
+    const content = fs.readFileSync(envPath, 'utf-8');
+    const match = content.match(/^OPENROUTER_API_KEY=(.+)/m);
+    if (match?.[1] && !match[1].startsWith('#')) {
+      return match[1].trim();
+    }
+  } catch {
+    // ~/.hermes/.env not found
+  }
+  return null;
+}
 
 const bibleLoader = new BibleLoader(getBiblesPath());
 const store = new JsonStore(path.join(app.getPath('userData'), 'settings.json'));
@@ -131,6 +161,11 @@ function registerIpc(): void {
   ipcMain.handle('tts:is-available', () => ttsEngine.isAvailable());
   ipcMain.handle('tts:speak', (_event, payload: { text: string }) => ttsEngine.speak(payload.text));
   ipcMain.handle('tts:stop', () => ttsEngine.stop());
+  ipcMain.handle('tts:update-config', (_event, payload: { voice?: string; speed?: number }) => {
+    if ('updateConfig' in ttsEngine) {
+      (ttsEngine as KokoroTTSEngine).updateConfig(payload.voice, payload.speed);
+    }
+  });
 
   ttsEngine.onStateChange((state) => {
     mainWindow?.webContents.send('tts:state-change', state);
@@ -182,5 +217,12 @@ if (!gotLock) {
 
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
+  });
+
+  // Clean up TTS temp files on quit
+  app.on('before-quit', () => {
+    if ('cleanup' in ttsEngine) {
+      (ttsEngine as KokoroTTSEngine).cleanup();
+    }
   });
 }

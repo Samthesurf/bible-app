@@ -14,6 +14,8 @@ const api = {
     isAvailable: () => ipcRenderer.invoke('tts:is-available'),
     speak: (text: string) => ipcRenderer.invoke('tts:speak', { text }),
     stop: () => ipcRenderer.invoke('tts:stop'),
+    updateConfig: (voice?: string, speed?: number) =>
+      ipcRenderer.invoke('tts:update-config', { voice, speed }),
     onStateChange: (callback: (state: unknown) => void) => {
       const listener = (_event: unknown, state: unknown) => callback(state);
       ipcRenderer.on('tts:state-change', listener);

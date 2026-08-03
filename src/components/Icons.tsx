@@ -87,3 +87,19 @@ export const CheckIcon = ({ size, className }: IconProps) => (
     <path d="M20 6 9 17l-5-5" />
   </svg>
 );
+
+/** Single-page icon (single reading mode). */
+export const SinglePageIcon = ({ size, className }: IconProps) => (
+  <svg {...base(size, className)}>
+    <rect width="12" height="16" x="6" y="4" rx="2" />
+    <path d="M9.5 8.5h5M9.5 12h5M9.5 15.5h3" />
+  </svg>
+);
+
+/** Two-page icon (parallel chapters mode). */
+export const SplitChaptersIcon = ({ size, className }: IconProps) => (
+  <svg {...base(size, className)}>
+    <rect width="7" height="18" x="3" y="3" rx="1.5" />
+    <rect width="7" height="18" x="14" y="3" rx="1.5" />
+  </svg>
+);

@@ -1,5 +1,7 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { BookMeta, TranslationMeta } from '../types/bible';
+
+type ParallelMode = 'translations' | 'chapters';
 
 interface BibleState {
   catalog: TranslationMeta[];
@@ -9,13 +11,18 @@ interface BibleState {
   chapterIndex: number;
   bookList: BookMeta[] | null;
   parallelEnabled: boolean;
+  parallelMode: ParallelMode;
   secondaryAbbr: string | null;
+  secondaryBookIndex: number;
+  secondaryChapterIndex: number;
   setTranslation: (abbr: string) => void;
   navigate: (bookIndex: number, chapterIndex: number) => void;
   nextChapter: () => void;
   prevChapter: () => void;
   toggleParallel: () => void;
+  setParallelMode: (mode: ParallelMode) => void;
   setSecondaryTranslation: (abbr: string) => void;
+  setSecondaryPosition: (bookIndex: number, chapterIndex: number) => void;
 }
 
 const BibleContext = createContext<BibleState | null>(null);
@@ -30,7 +37,12 @@ export function BibleProvider({ children }: { children: React.ReactNode }) {
   const [chapterIndex, setChapterIndex] = useState(0);
   const [bookList, setBookList] = useState<BookMeta[] | null>(null);
   const [parallelEnabled, setParallelEnabled] = useState(false);
+  const [parallelMode, setParallelModeState] = useState<ParallelMode>('translations');
   const [secondaryAbbr, setSecondaryAbbr] = useState<string | null>('NKJV');
+  const [secondaryBookIndex, setSecondaryBookIndex] = useState(0);
+  const [secondaryChapterIndex, setSecondaryChapterIndex] = useState(1);
+
+  const hydrated = useRef(false);
 
   // Load catalog once
   useEffect(() => {
@@ -41,9 +53,7 @@ export function BibleProvider({ children }: { children: React.ReactNode }) {
         setCatalogLoaded(true);
       }
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   // Load book list for the current translation
@@ -53,52 +63,73 @@ export function BibleProvider({ children }: { children: React.ReactNode }) {
     void window.electronAPI.bible.getBookList(translationAbbr).then((books) => {
       if (!cancelled) setBookList(books);
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [translationAbbr]);
 
-  // Clamp position when the book list changes (e.g. switching translation)
-  useEffect(() => {
-    if (!bookList) return;
-    if (bookIndex >= bookList.length) setBookIndex(0);
-    const book = bookList[bookIndex];
-    if (book && chapterIndex >= book.chapterCount) setChapterIndex(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookList]);
-
-  // Restore last position
+  // Restore all persisted state once
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
       window.electronAPI.store.get<string>('translationAbbr'),
       window.electronAPI.store.get<number>('bookIndex'),
       window.electronAPI.store.get<number>('chapterIndex'),
-    ]).then(([abbr, book, chapter]) => {
+      window.electronAPI.store.get<string>('parallelMode'),
+      window.electronAPI.store.get<string>('secondaryAbbr'),
+      window.electronAPI.store.get<number>('secondaryBookIndex'),
+      window.electronAPI.store.get<number>('secondaryChapterIndex'),
+    ]).then(([abbr, book, chapter, pm, secAbbr, secBook, secChap]) => {
       if (cancelled) return;
       if (abbr) setTranslationAbbr(abbr);
       if (typeof book === 'number') setBookIndex(book);
       if (typeof chapter === 'number') setChapterIndex(chapter);
+      if (pm === 'translations' || pm === 'chapters') setParallelModeState(pm);
+      if (secAbbr) setSecondaryAbbr(secAbbr);
+      if (typeof secBook === 'number') setSecondaryBookIndex(secBook);
+      if (typeof secChap === 'number') setSecondaryChapterIndex(secChap);
+      hydrated.current = true;
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
-  // Persist position on change
+  // Persist position on change (only after hydration)
   useEffect(() => {
+    if (!hydrated.current) return;
     void window.electronAPI.store.set('translationAbbr', translationAbbr);
   }, [translationAbbr]);
   useEffect(() => {
+    if (!hydrated.current) return;
     void window.electronAPI.store.set('bookIndex', bookIndex);
   }, [bookIndex]);
   useEffect(() => {
+    if (!hydrated.current) return;
     void window.electronAPI.store.set('chapterIndex', chapterIndex);
   }, [chapterIndex]);
+  useEffect(() => {
+    if (!hydrated.current) return;
+    void window.electronAPI.store.set('parallelMode', parallelMode);
+  }, [parallelMode]);
+  useEffect(() => {
+    if (!hydrated.current) return;
+    void window.electronAPI.store.set('secondaryAbbr', secondaryAbbr);
+  }, [secondaryAbbr]);
+  useEffect(() => {
+    if (!hydrated.current) return;
+    void window.electronAPI.store.set('secondaryBookIndex', secondaryBookIndex);
+  }, [secondaryBookIndex]);
+  useEffect(() => {
+    if (!hydrated.current) return;
+    void window.electronAPI.store.set('secondaryChapterIndex', secondaryChapterIndex);
+  }, [secondaryChapterIndex]);
+
+  // Clamp position when the book list changes
+  useEffect(() => {
+    if (!bookList) return;
+    if (bookIndex >= bookList.length) setBookIndex(0);
+    const book = bookList[bookIndex];
+    if (book && chapterIndex >= book.chapterCount) setChapterIndex(0);
+  }, [bookList, bookIndex, chapterIndex]);
 
   const setTranslation = useCallback((abbr: string) => {
-    // Keep the current book/chapter; the clamp effect fixes out-of-range
-    // positions after the new translation's book list loads.
     setTranslationAbbr(abbr);
   }, []);
 
@@ -112,12 +143,11 @@ export function BibleProvider({ children }: { children: React.ReactNode }) {
       if (!bookList) return c + 1;
       const book = bookList[bookIndex];
       if (book && c + 1 < book.chapterCount) return c + 1;
-      // Move to the next book, chapter 0
       if (bookIndex + 1 < bookList.length) {
         setBookIndex(bookIndex + 1);
         return 0;
       }
-      return c; // already at the very end
+      return c;
     });
   }, [bookIndex, bookList]);
 
@@ -125,13 +155,12 @@ export function BibleProvider({ children }: { children: React.ReactNode }) {
     setChapterIndex((c) => {
       if (c > 0) return c - 1;
       if (!bookList) return 0;
-      // Move to the previous book, last chapter
       if (bookIndex - 1 >= 0) {
         const prevBook = bookList[bookIndex - 1];
         setBookIndex(bookIndex - 1);
         return prevBook ? prevBook.chapterCount - 1 : 0;
       }
-      return 0; // already at the very start
+      return 0;
     });
   }, [bookIndex, bookList]);
 
@@ -139,8 +168,25 @@ export function BibleProvider({ children }: { children: React.ReactNode }) {
     setParallelEnabled((enabled) => !enabled);
   }, []);
 
+  const setParallelMode = useCallback((mode: ParallelMode) => {
+    setParallelModeState(mode);
+    // Smart default: when switching to chapters mode, set secondary to next chapter
+    if (mode === 'chapters' && bookList) {
+      const book = bookList[bookIndex];
+      if (book) {
+        setSecondaryBookIndex(bookIndex);
+        setSecondaryChapterIndex(Math.min(chapterIndex + 1, book.chapterCount - 1));
+      }
+    }
+  }, [bookIndex, chapterIndex, bookList]);
+
   const setSecondaryTranslation = useCallback((abbr: string) => {
     setSecondaryAbbr(abbr);
+  }, []);
+
+  const setSecondaryPosition = useCallback((book: number, chapter: number) => {
+    setSecondaryBookIndex(book);
+    setSecondaryChapterIndex(chapter);
   }, []);
 
   const value = useMemo<BibleState>(
@@ -152,29 +198,24 @@ export function BibleProvider({ children }: { children: React.ReactNode }) {
       chapterIndex,
       bookList,
       parallelEnabled,
+      parallelMode,
       secondaryAbbr,
+      secondaryBookIndex,
+      secondaryChapterIndex,
       setTranslation,
       navigate,
       nextChapter,
       prevChapter,
       toggleParallel,
+      setParallelMode,
       setSecondaryTranslation,
+      setSecondaryPosition,
     }),
     [
-      catalog,
-      catalogLoaded,
-      translationAbbr,
-      bookIndex,
-      chapterIndex,
-      bookList,
-      parallelEnabled,
-      secondaryAbbr,
-      setTranslation,
-      navigate,
-      nextChapter,
-      prevChapter,
-      toggleParallel,
-      setSecondaryTranslation,
+      catalog, catalogLoaded, translationAbbr, bookIndex, chapterIndex, bookList,
+      parallelEnabled, parallelMode, secondaryAbbr, secondaryBookIndex, secondaryChapterIndex,
+      setTranslation, navigate, nextChapter, prevChapter, toggleParallel,
+      setParallelMode, setSecondaryTranslation, setSecondaryPosition,
     ],
   );
 

@@ -10,8 +10,61 @@ const THEMES: { id: Theme; label: string }[] = [
   { id: 'dark', label: 'Dark' },
 ];
 
-export default function TextSettingsPopover({ onClose }: { onClose: () => void }): React.ReactElement {
-  const { theme, fontSize, lineHeight, setTheme, setFontSize, setLineHeight } = useSettings();
+const VOICE_GROUPS = [
+  {
+    label: 'American Female',
+    voices: [
+      { id: 'af_heart', name: 'Heart' },
+      { id: 'af_bella', name: 'Bella' },
+      { id: 'af_nicole', name: 'Nicole' },
+      { id: 'af_sarah', name: 'Sarah' },
+      { id: 'af_sky', name: 'Sky' },
+    ],
+  },
+  {
+    label: 'American Male',
+    voices: [
+      { id: 'am_adam', name: 'Adam' },
+      { id: 'am_michael', name: 'Michael' },
+      { id: 'am_liam', name: 'Liam' },
+      { id: 'am_echo', name: 'Echo' },
+    ],
+  },
+  {
+    label: 'British Female',
+    voices: [
+      { id: 'bf_emma', name: 'Emma' },
+      { id: 'bf_isabella', name: 'Isabella' },
+    ],
+  },
+  {
+    label: 'British Male',
+    voices: [
+      { id: 'bm_george', name: 'George' },
+      { id: 'bm_fable', name: 'Fable' },
+      { id: 'bm_lewis', name: 'Lewis' },
+    ],
+  },
+];
+
+interface Props {
+  onClose: () => void;
+  ttsAvailable?: boolean;
+}
+
+export default function TextSettingsPopover({ onClose, ttsAvailable }: Props): React.ReactElement {
+  const {
+    theme,
+    fontSize,
+    lineHeight,
+    ttsVoice,
+    ttsSpeed,
+    setTheme,
+    setFontSize,
+    setLineHeight,
+    setTTSVoice,
+    setTTSSpeed,
+  } = useSettings();
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,6 +107,48 @@ export default function TextSettingsPopover({ onClose }: { onClose: () => void }
           className="tts-popover__slider"
         />
       </div>
+
+      {ttsAvailable && (
+        <>
+          <div className="tts-popover__group">
+            <label className="tts-popover__label" htmlFor="voice-select">
+              Voice
+            </label>
+            <select
+              id="voice-select"
+              className="tts-popover__select"
+              value={ttsVoice}
+              onChange={(e) => setTTSVoice(e.target.value)}
+            >
+              {VOICE_GROUPS.map((g) => (
+                <optgroup key={g.label} label={g.label}>
+                  {g.voices.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+
+          <div className="tts-popover__group">
+            <label className="tts-popover__label" htmlFor="speed-slider">
+              Speed <span className="tts-popover__value">{ttsSpeed.toFixed(1)}×</span>
+            </label>
+            <input
+              id="speed-slider"
+              type="range"
+              min={0.5}
+              max={2.0}
+              step={0.1}
+              value={ttsSpeed}
+              onChange={(e) => setTTSSpeed(Number(e.target.value))}
+              className="tts-popover__slider"
+            />
+          </div>
+        </>
+      )}
 
       <div className="tts-popover__group">
         <span className="tts-popover__label">Theme</span>

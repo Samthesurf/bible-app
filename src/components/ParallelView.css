@@ -1,6 +1,9 @@
 .parallel-view {
   display: grid;
-  grid-template-columns: 1fr 1px 1fr;
+  /* Divider line = 1px gap on a border-colored background */
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--color-border);
   height: 100%;
   overflow: hidden;
 }
@@ -9,14 +12,6 @@
   overflow-y: auto;
   height: 100%;
   background: var(--color-bg);
-}
-
-.parallel-column:first-child {
-  border-right: 1px solid var(--color-border);
-}
-
-.parallel-divider {
-  display: none;
 }
 
 .parallel-column__header {
@@ -30,6 +25,27 @@
   padding: 10px 32px;
   background: var(--color-bg);
   border-bottom: 1px solid var(--color-border);
+}
+
+.parallel-column__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.parallel-column__badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  padding: 2px 8px;
+  border-radius: var(--radius-lg);
+  flex-shrink: 0;
 }
 
 .parallel-column__name {
@@ -91,7 +107,9 @@
 }
 
 .parallel-selector__item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   text-align: left;
   padding: 7px 10px;
@@ -112,6 +130,15 @@
   color: var(--color-accent);
 }
 
+.parallel-selector__item-name {
+  font-weight: 400;
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Narrow windows: stack parallel columns */
 @media (max-width: 900px) {
   .parallel-view {
@@ -122,9 +149,5 @@
   .parallel-column {
     overflow-y: visible;
     height: auto;
-  }
-  .parallel-column:first-child {
-    border-right: none;
-    border-bottom: 1px solid var(--color-border);
   }
 }

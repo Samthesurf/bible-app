@@ -4,7 +4,9 @@ import BookChapterPicker from './BookChapterPicker';
 import VersionPicker from './VersionPicker';
 import TTSButton from './TTSButton';
 import TextSettingsPopover from './TextSettingsPopover';
-import { ChevronDown, ColumnsIcon } from './Icons';
+import ParallelModeSelector from './ParallelModeSelector';
+import type { ViewMode } from './ParallelModeSelector';
+import { ChevronDown } from './Icons';
 import './ReadingToolbar.css';
 
 export default function ReadingToolbar(): React.ReactElement {
@@ -15,15 +17,23 @@ export default function ReadingToolbar(): React.ReactElement {
     bookIndex,
     chapterIndex,
     parallelEnabled,
+    parallelMode,
     toggleParallel,
+    setParallelMode,
   } = useBible();
 
   const [bookPickerOpen, setBookPickerOpen] = useState(false);
   const [versionPickerOpen, setVersionPickerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [ttsAvailable, setTtsAvailable] = useState(false);
 
-  const translation = catalog.find((t) => t.abbr === translationAbbr);
-  const book = bookList?.[bookIndex];
+  useEffect(() => {
+    let cancelled = false;
+    void window.electronAPI.tts.isAvailable().then((ok) => {
+      if (!cancelled) setTtsAvailable(ok);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // Close dropdowns on Escape
   useEffect(() => {
@@ -37,6 +47,19 @@ export default function ReadingToolbar(): React.ReactElement {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
+
+  const translation = catalog.find((t) => t.abbr === translationAbbr);
+  const book = bookList?.[bookIndex];
+
+  const onModeChange = (mode: ViewMode) => {
+    if (mode === 'single') {
+      if (parallelEnabled) toggleParallel();
+    } else {
+      if (!parallelEnabled) toggleParallel();
+      setParallelMode(mode === 'translations' ? 'translations' : 'chapters');
+    }
+  };
+  const currentMode: ViewMode = !parallelEnabled ? 'single' : parallelMode;
 
   return (
     <div className="toolbar">
@@ -74,19 +97,11 @@ export default function ReadingToolbar(): React.ReactElement {
             <VersionPicker isOpen={versionPickerOpen} onClose={() => setVersionPickerOpen(false)} />
           )}
         </div>
+
+        <ParallelModeSelector mode={currentMode} onChange={onModeChange} />
       </div>
 
       <div className="toolbar__right">
-        <button
-          type="button"
-          className={`icon-btn${parallelEnabled ? ' icon-btn--active' : ''}`}
-          onClick={toggleParallel}
-          title="Parallel view"
-          aria-label="Toggle parallel view"
-          aria-pressed={parallelEnabled}
-        >
-          <ColumnsIcon size={19} />
-        </button>
         <TTSButton />
         <div className="toolbar__anchor">
           <button
@@ -102,7 +117,9 @@ export default function ReadingToolbar(): React.ReactElement {
               A
             </span>
           </button>
-          {settingsOpen && <TextSettingsPopover onClose={() => setSettingsOpen(false)} />}
+          {settingsOpen && (
+            <TextSettingsPopover onClose={() => setSettingsOpen(false)} ttsAvailable={ttsAvailable} />
+          )}
         </div>
       </div>
     </div>
