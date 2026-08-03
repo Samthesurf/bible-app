@@ -1,6 +1,7 @@
 import React from 'react';
 import { BibleProvider } from './context/BibleContext';
 import { SettingsProvider } from './context/SettingsContext';
+import { PlaybackProvider } from './context/PlaybackContext';
 import Header from './components/Header';
 import ReadingToolbar from './components/ReadingToolbar';
 import ReadingArea from './components/ReadingArea';
@@ -10,12 +11,14 @@ export default function App(): React.ReactElement {
   return (
     <SettingsProvider>
       <BibleProvider>
-        <div className="app-shell">
-          <Header />
-          <ReadingToolbar />
-          <ReadingArea />
-          <Footer />
-        </div>
+        <PlaybackProvider>
+          <div className="app-shell">
+            <Header />
+            <ReadingToolbar />
+            <ReadingArea />
+            <Footer />
+          </div>
+        </PlaybackProvider>
       </BibleProvider>
     </SettingsProvider>
   );

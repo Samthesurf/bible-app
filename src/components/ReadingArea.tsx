@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useBible } from '../context/BibleContext';
+import { usePlayback } from '../context/PlaybackContext';
 import { useChapter } from '../hooks/useChapter';
 import { useKeyboardNav } from '../hooks/useKeyboardNav';
 import ChapterView from './ChapterView';
@@ -15,10 +16,10 @@ import './ReadingArea.css';
 export default function ReadingArea(): React.ReactElement {
   const { translationAbbr, bookIndex, chapterIndex, bookList, parallelEnabled, nextChapter, prevChapter } =
     useBible();
+  const playback = usePlayback();
   const { chapter, loading, error } = useChapter(translationAbbr, bookIndex, chapterIndex);
 
   const [ttsAvailable, setTtsAvailable] = useState(false);
-  const [playingVerse, setPlayingVerse] = useState<number | null>(null);
   const readingRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -37,13 +38,12 @@ export default function ReadingArea(): React.ReactElement {
   const atStart = bookIndex === 0 && chapterIndex === 0;
   const atEnd = book ? chapterIndex >= book.chapterCount - 1 && bookIndex >= (bookList?.length ?? 1) - 1 : false;
 
-  const playVerse = useCallback((verseIndex: number, verseText: string) => {
-    setPlayingVerse(verseIndex);
-    void window.electronAPI.tts
-      .speak(verseText)
-      .then(() => setPlayingVerse(null))
-      .catch(() => setPlayingVerse(null));
-  }, []);
+  // Live highlight: only when the playback is for the chapter currently on screen.
+  const isCurrentChapter =
+    (playback.mode === 'chapter' || playback.mode === 'verse') &&
+    playback.bookIndex === bookIndex &&
+    playback.chapterIndex === chapterIndex;
+  const playingVerse = isCurrentChapter ? playback.verseIndex : null;
 
   return (
     <main className="reading-area" ref={readingRef}>
@@ -72,24 +72,24 @@ export default function ReadingArea(): React.ReactElement {
           <ChapterView
             chapter={chapter}
             ttsAvailable={ttsAvailable}
-            onPlayVerse={playVerse}
-            onStopVerse={() => {
-              void window.electronAPI.tts.stop();
-              setPlayingVerse(null);
-            }}
+            onPlayVerse={(i, text) => void playback.playVerse(bookIndex, chapterIndex, i, text)}
+            onStopVerse={() => void playback.stop()}
             playingVerse={playingVerse}
+            selectionHighlight={
+              playback.mode === 'selection' && playback.selection && playback.selection.column !== 'secondary'
+                ? { start: playback.selection.start, end: playback.selection.end }
+                : null
+            }
           />
         )}
 
         {!loading && !error && chapter && parallelEnabled && (
           <ParallelView
             ttsAvailable={ttsAvailable}
-            onPlayVerse={playVerse}
-            onStopVerse={() => {
-              void window.electronAPI.tts.stop();
-              setPlayingVerse(null);
-            }}
+            onPlayVerse={(i, text) => void playback.playVerse(bookIndex, chapterIndex, i, text)}
+            onStopVerse={() => void playback.stop()}
             playingVerse={playingVerse}
+            selection={playback.mode === 'selection' ? playback.selection : null}
           />
         )}
       </div>

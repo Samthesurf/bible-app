@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { useBible } from '../context/BibleContext';
 import { useChapter } from '../hooks/useChapter';
+import type { SelectionRange } from '../context/PlaybackContext';
 import ChapterView from './ChapterView';
 import SecondaryChapterPicker from './SecondaryChapterPicker';
 import './ParallelView.css';
@@ -10,6 +11,7 @@ interface Props {
   onPlayVerse?: (verseIndex: number, verseText: string) => void;
   onStopVerse?: () => void;
   playingVerse?: number | null;
+  selection?: SelectionRange | null;
 }
 
 /**
@@ -25,6 +27,7 @@ export default function ParallelView({
   onPlayVerse,
   onStopVerse,
   playingVerse,
+  selection,
 }: Props): React.ReactElement {
   const {
     translationAbbr,
@@ -86,6 +89,7 @@ export default function ParallelView({
             onPlayVerse={onPlayVerse}
             onStopVerse={onStopVerse}
             playingVerse={playingVerse}
+            selectionHighlight={selection && selection.column !== 'secondary' ? { start: selection.start, end: selection.end } : null}
           />
         )}
       </div>
@@ -106,7 +110,7 @@ export default function ParallelView({
             ttsAvailable={ttsAvailable}
             onPlayVerse={onPlayVerse}
             onStopVerse={onStopVerse}
-            playingVerse={playingVerse}
+            selectionHighlight={selection && selection.column === 'secondary' ? { start: selection.start, end: selection.end } : null}
           />
         )}
         <div className="parallel-column__footer">{secondary.chapter?.copyright}</div>

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { TTSState } from '../types/tts';
+import { usePlayback, type SelectionRange } from '../context/PlaybackContext';
 import { SpeakerIcon, StopIcon } from './Icons';
 import './SelectionTTS.css';
 
@@ -13,37 +13,48 @@ interface SelState {
   text: string;
   x: number;
   y: number;
+  range: SelectionRange | null;
 }
 
 /**
  * Floating TTS control for highlighted text. When the user selects verses in
  * the reading area, a small "play" pill appears under the selection; clicking
  * it speaks exactly the highlighted text (any range: one verse, several, or a
- * partial verse).
+ * partial verse). The affected verses are highlighted while it plays.
  */
 export default function SelectionTTS({ containerRef, ttsAvailable }: Props): React.ReactElement {
+  const { speaking, playSelection } = usePlayback();
   const [sel, setSel] = useState<SelState | null>(null);
-  const [speaking, setSpeaking] = useState(false);
-  const pillRef = useRef<HTMLButtonElement>(null);
-
-  // Track whether the pill itself is being interacted with, so interacting
-  // with it doesn't immediately dismiss it.
   const interacting = useRef(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    const unsubscribe = window.electronAPI.tts.onStateChange((state: TTSState) => {
-      if (cancelled) return;
-      setSpeaking(state.status === 'speaking');
-      if (state.status === 'idle' || state.status === 'error') {
-        setSel((s) => (s ? { ...s } : s)); // keep the pill visible for re-play
+  /** Map the current selection to a verse index range + which column it's in. */
+  const computeRange = useCallback((): SelectionRange | null => {
+    const container = containerRef.current;
+    const selection = window.getSelection();
+    if (!container || !selection || !selection.rangeCount) return null;
+    const selRange = selection.getRangeAt(0);
+    const verses = Array.from(container.querySelectorAll<HTMLElement>('.verse'));
+    const indices: number[] = [];
+    for (const v of verses) {
+      if (selRange.intersectsNode(v)) {
+        const di = v.dataset.verseIndex;
+        if (di != null) indices.push(parseInt(di, 10));
       }
-    });
-    return () => {
-      cancelled = true;
-      unsubscribe();
+    }
+    if (indices.length === 0) return null;
+
+    const columns = Array.from(container.querySelectorAll('.parallel-column'));
+    const anchor = selection.anchorNode;
+    const colEl = anchor instanceof Node ? anchor.parentElement?.closest('.parallel-column') : null;
+    const colIndex = colEl ? columns.indexOf(colEl) : -1;
+    const column: SelectionRange['column'] = colIndex === 0 ? 'primary' : colIndex > 0 ? 'secondary' : null;
+
+    return {
+      column,
+      start: Math.min(...indices),
+      end: Math.max(...indices),
     };
-  }, []);
+  }, [containerRef]);
 
   const readSelection = useCallback(() => {
     const container = containerRef.current;
@@ -61,8 +72,6 @@ export default function SelectionTTS({ containerRef, ttsAvailable }: Props): Rea
       return;
     }
 
-    // Ignore selections that start outside the reading container (toolbar,
-    // search bar, dropdowns).
     const anchor = selection.anchorNode;
     if (!anchor || (anchor.nodeType === Node.TEXT_NODE ? !container.contains(anchor.parentNode) : !container.contains(anchor))) {
       setSel(null);
@@ -76,15 +85,12 @@ export default function SelectionTTS({ containerRef, ttsAvailable }: Props): Rea
       return;
     }
 
-    // Position the pill just below the selection.
     const width = 150;
     const x = Math.min(Math.max(rect.left, 8), window.innerWidth - width - 8);
     const y = rect.bottom + 10;
-    setSel({ text, x, y });
-  }, [containerRef, ttsAvailable]);
+    setSel({ text, x, y, range: computeRange() });
+  }, [containerRef, ttsAvailable, computeRange]);
 
-  // Update pill position while the selection is being extended (drag). We
-  // listen on the container for mouseup only; scrolling clears it.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -109,7 +115,6 @@ export default function SelectionTTS({ containerRef, ttsAvailable }: Props): Rea
     };
   }, [containerRef, readSelection, sel]);
 
-  // If TTS becomes unavailable, drop the pill.
   useEffect(() => {
     if (!ttsAvailable) setSel(null);
   }, [ttsAvailable]);
@@ -120,13 +125,12 @@ export default function SelectionTTS({ containerRef, ttsAvailable }: Props): Rea
     if (speaking) {
       void window.electronAPI.tts.stop();
     } else {
-      void window.electronAPI.tts.speak(sel.text);
+      void playSelection(sel.text, sel.range);
     }
   };
 
   return (
     <button
-      ref={pillRef}
       type="button"
       className={`seltts${speaking ? ' seltts--speaking' : ''}`}
       style={{ left: sel.x, top: sel.y }}
@@ -142,8 +146,9 @@ export default function SelectionTTS({ containerRef, ttsAvailable }: Props): Rea
         onPlay();
       }}
       onMouseLeave={() => {
-        // Re-arm after leaving so the next selection can dismiss normally.
-        setTimeout(() => { interacting.current = false; }, 100);
+        setTimeout(() => {
+          interacting.current = false;
+        }, 100);
       }}
       title={speaking ? 'Stop' : 'Play selection'}
     >

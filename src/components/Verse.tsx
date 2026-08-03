@@ -9,6 +9,7 @@ interface Props {
   onPlayTTS?: (verseText: string) => void;
   onStopTTS?: () => void;
   isPlaying?: boolean;
+  isSelection?: boolean;
 }
 
 export default function Verse({
@@ -18,6 +19,7 @@ export default function Verse({
   onPlayTTS,
   onStopTTS,
   isPlaying,
+  isSelection,
 }: Props): React.ReactElement {
   const [hovered, setHovered] = useState(false);
 
@@ -25,7 +27,10 @@ export default function Verse({
 
   return (
     <p
-      className={`verse${isPlaying ? ' verse--playing' : ''}`}
+      className={`verse${isPlaying ? ' verse--playing' : ''}${
+        isSelection ? ' verse--selection' : ''
+      }`}
+      data-verse-index={number - 1}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >

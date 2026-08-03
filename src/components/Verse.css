@@ -16,6 +16,15 @@
   margin-right: -8px;
 }
 
+.verse--selection {
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  margin-left: -8px;
+  margin-right: -8px;
+  opacity: 0.55;
+}
+
 .verse__number {
   font-family: var(--font-ui);
   font-size: var(--font-size-verse-num);
