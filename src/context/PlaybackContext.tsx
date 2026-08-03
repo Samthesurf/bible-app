@@ -98,15 +98,21 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
       setVerseIndex(0);
       setSelection(null);
 
+      // Hot start: prefetch the first 4 verses in parallel before the loop.
+      // They all land while verse 0 is fetching/playing.
+      const hotStart = Math.min(4, verses.length);
+      for (let j = 0; j < hotStart; j += 1) {
+        void window.electronAPI.tts.prefetch(verses[j]);
+      }
+
       for (let i = 0; i < verses.length; i += 1) {
         if (stopFlag.current) break;
         setVerseIndex(i);
-        // Prefetch the next 3 verses while this one plays, so the window is
-        // always filled: verse i plays while i+1..i+3 load. The engine queues
-        // and dedups, so re-firing is safe.
-        const ahead = Math.min(3, verses.length - i - 1);
-        for (let j = 1; j <= ahead; j += 1) {
-          void window.electronAPI.tts.prefetch(verses[i + j]);
+        // Refill the sliding window: only the NEW tail verse (i+3) needs
+        // fetching this step — i+1..i+3 are already cached or in flight.
+        const tail = i + 3;
+        if (tail < verses.length) {
+          void window.electronAPI.tts.prefetch(verses[tail]);
         }
         try {
           await speakWithRetry(verses[i]);
