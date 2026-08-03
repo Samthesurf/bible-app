@@ -58,6 +58,44 @@
   box-shadow: 0 0 0 3px var(--color-accent-soft);
 }
 
+.tts-popover__cache {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}
+
+.tts-popover__badge {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-lg);
+  white-space: nowrap;
+}
+
+.tts-popover__badge--local {
+  color: #15803d;
+  background: #dcfce7;
+}
+
+.tts-popover__badge--openrouter {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.tts-popover__badge--none {
+  color: var(--color-text-muted);
+  background: var(--color-surface-hover);
+}
+
+.tts-popover__cached {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
 .tts-popover__themes {
   display: flex;
   gap: 10px;

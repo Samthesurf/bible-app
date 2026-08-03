@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSettings, FONT_SIZE_MIN, FONT_SIZE_MAX, LINE_HEIGHT_MIN, LINE_HEIGHT_MAX } from '../context/SettingsContext';
 import type { Theme } from '../context/SettingsContext';
 import { CheckIcon } from './Icons';
@@ -66,6 +66,24 @@ export default function TextSettingsPopover({ onClose, ttsAvailable }: Props): R
     setTTSSpeed,
   } = useSettings();
   const rootRef = useRef<HTMLDivElement>(null);
+  const [ttsStats, setTtsStats] = useState<{ cached: number; lastSource: string } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => {
+      void window.electronAPI.tts.getStats().then((s) => {
+        if (!cancelled) setTtsStats(s);
+      });
+    };
+    refresh();
+    // Refresh periodically while the popover is open so the cache count
+    // updates live as background warming runs.
+    const iv = window.setInterval(refresh, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(iv);
+    };
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -146,6 +164,20 @@ export default function TextSettingsPopover({ onClose, ttsAvailable }: Props): R
               onChange={(e) => setTTSSpeed(Number(e.target.value))}
               className="tts-popover__slider"
             />
+          </div>
+
+          <div className="tts-popover__group">
+            <span className="tts-popover__label">Cache</span>
+            {ttsStats ? (
+              <div className="tts-popover__cache">
+                <span className={`tts-popover__badge tts-popover__badge--${ttsStats.lastSource}`}>
+                  {ttsStats.lastSource === 'local' ? '● Local' : ttsStats.lastSource === 'openrouter' ? '● OpenRouter' : '—'}
+                </span>
+                <span className="tts-popover__cached">{ttsStats.cached} verse{ttsStats.cached === 1 ? '' : 's'} cached locally</span>
+              </div>
+            ) : (
+              <span className="tts-popover__cached">…</span>
+            )}
           </div>
         </>
       )}

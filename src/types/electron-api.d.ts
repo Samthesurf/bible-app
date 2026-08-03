@@ -12,6 +12,7 @@ declare global {
       };
       tts: {
         isAvailable(): Promise<boolean>;
+        getStats(): Promise<{ cached: number; lastSource: string }>;
         speak(text: string): Promise<void>;
         prefetch(text: string): Promise<void>;
         stop(): Promise<void>;

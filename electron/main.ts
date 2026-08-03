@@ -190,6 +190,12 @@ function registerIpc(): void {
   );
 
   ipcMain.handle('tts:is-available', () => ttsEngine.isAvailable());
+  ipcMain.handle('tts:get-stats', () => {
+    if ('getStats' in ttsEngine) {
+      return (ttsEngine as unknown as { getStats: () => { cached: number; lastSource: string } }).getStats();
+    }
+    return { cached: 0, lastSource: 'none' };
+  });
   ipcMain.handle('tts:speak', (_event, payload: { text: string }) => ttsEngine.speak(payload.text));
   ipcMain.handle('tts:prefetch', (_event, payload: { text: string }) => {
     if ('prefetch' in ttsEngine) {

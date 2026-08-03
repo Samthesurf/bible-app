@@ -22,7 +22,8 @@ export class LocalKokoroTTSEngine implements TTSEngine {
   private currentProcess: ChildProcess | null = null;
   private service: ChildProcess | null = null;
   private stdoutBuffer = '';
-  private pending: { resolve: (p: string) => void; reject: (e: Error) => void } | null = null;
+  /** FIFO of in-flight synthesis requests, matched to responses in order. */
+  private pendingQueue: { resolve: (p: string) => void; reject: (e: Error) => void }[] = [];
   private available: boolean | null = null;
   private readonly servicePath: string;
   private readonly pythonPath: string;
@@ -90,28 +91,29 @@ export class LocalKokoroTTSEngine implements TTSEngine {
       });
       svc.on('error', () => {
         this.available = false;
-        if (this.pending) {
-          this.pending.reject(new Error('Failed to start local Kokoro service'));
-          this.pending = null;
-        }
+        this.failQueue(new Error('Failed to start local Kokoro service'));
         resolve(null);
       });
       svc.on('exit', () => {
         this.service = null;
-        if (this.pending) {
-          this.pending.reject(new Error('Local Kokoro service exited'));
-          this.pending = null;
-        }
+        this.failQueue(new Error('Local Kokoro service exited'));
       });
       // Give it a moment to load the model before returning.
       setTimeout(() => resolve(svc.exitCode === null ? svc : null), 1500);
     });
   }
 
+  private failQueue(err: Error): void {
+    while (this.pendingQueue.length) {
+      const p = this.pendingQueue.shift();
+      if (p) p.reject(err);
+    }
+  }
+
   private handleLine(line: string): void {
-    if (!this.pending) return;
-    const { resolve, reject } = this.pending;
-    this.pending = null;
+    const next = this.pendingQueue.shift();
+    if (!next) return;
+    const { resolve, reject } = next;
     try {
       const msg = JSON.parse(line);
       if (msg.ok) resolve(msg.path);
@@ -127,7 +129,7 @@ export class LocalKokoroTTSEngine implements TTSEngine {
         reject(new Error('Local Kokoro service not running'));
         return;
       }
-      this.pending = { resolve, reject };
+      this.pendingQueue.push({ resolve, reject });
       this.service.stdin?.write(JSON.stringify({ text, voice, speed }) + '\n');
     });
   }

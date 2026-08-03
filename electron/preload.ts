@@ -12,6 +12,7 @@ const api = {
   },
   tts: {
     isAvailable: () => ipcRenderer.invoke('tts:is-available'),
+    getStats: () => ipcRenderer.invoke('tts:get-stats'),
     speak: (text: string) => ipcRenderer.invoke('tts:speak', { text }),
     prefetch: (text: string) => ipcRenderer.invoke('tts:prefetch', { text }),
     stop: () => ipcRenderer.invoke('tts:stop'),

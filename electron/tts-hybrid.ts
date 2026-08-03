@@ -25,6 +25,7 @@ export class HybridTTSEngine implements TTSEngine {
   private currentProcess: ChildProcess | null = null;
   private defaultVoice = 'af_heart';
   private defaultSpeed = 1.0;
+  private lastSource: 'local' | 'openrouter' | 'none' = 'none';
 
   constructor(openrouter: KokoroTTSEngine, local: LocalKokoroTTSEngine) {
     this.openrouter = openrouter;
@@ -49,12 +50,14 @@ export class HybridTTSEngine implements TTSEngine {
       const cached = this.local.getCachedPath(text, voice, speed);
       if (cached) {
         // Cache hit: play locally, instantly.
+        this.lastSource = 'local';
         await this.playFile(cached);
         this.emitState({ status: 'idle' });
         return;
       }
 
       // Cache miss: play via OpenRouter now, warm the cache in background.
+      this.lastSource = 'openrouter';
       void this.local.generateAndCache(text, voice, speed);
       await this.openrouter.speak(text, options);
       this.emitState({ status: 'idle' });
@@ -130,7 +133,12 @@ export class HybridTTSEngine implements TTSEngine {
     });
   }
 
-  /** For diagnostics/tests: how many verses are cached. */
+  /** For diagnostics/tests: cache stats + which backend last played. */
+  getStats(): { cached: number; lastSource: string } {
+    const stats = this.cacheStats();
+    return { cached: stats.cached, lastSource: this.lastSource };
+  }
+
   cacheStats(): { cached: number; dir: string } {
     const dir = (this.local as unknown as { cacheDir: string }).cacheDir;
     let count = 0;
