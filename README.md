@@ -2,34 +2,34 @@
 
 An offline desktop Bible reader built with Electron + React + TypeScript,
 replicating the clean Bible.com reading experience. Ships with **56 English
-translations** (~204 MB) fully bundled — no internet required.
+translations** (~204 MB) fully bundled, no internet required.
 
 ## Features
 
-- **56 translations** — KJV, NKJV, NLT, GNT, GW, ESV, NIV, NASB and more,
+- **56 translations**: KJV, NKJV, NLT, GNT, GW, ESV, NIV, NASB and more,
   switched via the version dropdown (filterable)
-- **Bible.com-style reading UI** — centered serif column, superscript verse
+- **Bible.com-style reading UI**: centered serif column, superscript verse
   numbers, circular prev/next arrows, copyright footer
-- **Themes** — Light / Sepia / Dark via the AA popover, plus font size and
+- **Themes**: Light / Sepia / Dark via the AA popover, plus font size and
   line spacing sliders (persisted)
-- **Parallel view** — two translations side by side with synced scrolling
+- **Parallel view**: two translations side by side with synced scrolling
   (stacks automatically in narrow windows)
-- **Search** — instant verse search across the loaded translation, from the
+- **Search**: instant verse search across the loaded translation, from the
   header search bar
-- **Keyboard navigation** — ← / → for prev / next chapter
-- **TTS ready** — toolbar audio button + per-verse play affordance. The
-  engine is a stub; see below for wiring
-- **Remembers your place** — last translation, book and chapter restored on
+- **Keyboard navigation**: ← / → for prev / next chapter
+- **TTS**: toolbar audio button and per-verse play affordance, powered by
+  the hybrid engine described below
+- **Remembers your place**: last translation, book and chapter restored on
   launch
 
 ## Data
 
-- `bibles/*.json` — one compact JSON per translation:
+- `bibles/*.json`: one compact JSON per translation:
   `{abbr, name, copyright, books: [{name, chapters: [["verse 1", ...], ...]}]}`
-- `bibles/index.json` — catalog (abbr, name, copyright, counts)
+- `bibles/index.json`: catalog (abbr, name, copyright, counts)
 - Verse number = array index + 1
 - Regenerate from the raw source with `python3 build_bibles.py` (re-clones
-  the upstream repo first — see the script header)
+  the upstream repo first, see the script header)
 
 ## Development
 
@@ -52,7 +52,7 @@ npm run build:dir      # unpacked build only (faster for testing)
 The packaged app loads bibles from `<app>/resources/bibles`
 (electron-builder `extraResources`). Artifacts land in `release/`.
 
-## Wiring up text-to-speech
+## Text-to-speech
 
 **Hybrid engine (default):** plays each verse live via OpenRouter's Kokoro
 (`hexgrad/kokoro-82m`) while a **local Kokoro-onnx** model synthesizes the same
