@@ -57,7 +57,7 @@ The packaged app loads bibles from `<app>/resources/bibles`
 **Hybrid engine (default):** plays each verse live via OpenRouter's Kokoro
 (`hexgrad/kokoro-82m`) while a **local Kokoro-onnx** model synthesizes the same
 verse in the background into a persistent cache (`~/.cache/bible-app-kokoro/`).
-The next time that verse is played it's read from the local cache — instant and
+The next time that verse is played it's read from the local cache; instant and
 free. First pass through a passage costs a few cents of OpenRouter credits;
 repeat readings are entirely offline. Falls back to OpenRouter-only, then
 local-only, then a stub as prerequisites are missing.
