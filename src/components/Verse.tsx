@@ -26,45 +26,54 @@ export default function Verse({
 }: Props): React.ReactElement {
   const [hovered, setHovered] = useState(false);
 
-  const showTTS = ttsAvailable && (hovered || isPlaying);
-  const displayText = cleanVerseText(text);
+  // The row is a flex line: a reserved action rail plus the verse text. The
+  // buttons live IN the rail (real in-flow children), so the text -> gutter
+  // -> button journey is one continuous hover surface. No gap, no vanish.
+  const active = hovered || isPlaying;
+  const canPlay = ttsAvailable && Boolean(onPlayTTS);
 
   return (
-    <p
-      className={`verse${isPlaying ? ' verse--playing' : ''}${
-        isSelection ? ' verse--selection' : ''
-      }`}
-      data-verse-index={number - 1}
+    <div
+      className={`verse-row${active ? ' verse-row--active' : ''}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {showTTS && (
-        <button
-          type="button"
-          className="verse__play"
-          title={isPlaying ? 'Stop' : 'Play verse'}
-          aria-label={isPlaying ? 'Stop reading this verse' : 'Read this verse aloud'}
-          onClick={() => {
-            if (isPlaying) onStopTTS?.();
-            else onPlayTTS?.(text);
-          }}
-        >
-          {isPlaying ? <StopIcon size={14} /> : <PlayIcon size={14} />}
-        </button>
-      )}
-      {onCompare && hovered && (
-        <button
-          type="button"
-          className="verse__compare"
-          title="Compare in all translations"
-          aria-label={`Compare ${number} in all translations`}
-          onClick={onCompare}
-        >
-          <CompareIcon size={14} />
-        </button>
-      )}
-      <span className="verse__number">{number}</span>
-      <span className="verse__text">{displayText}</span>
-    </p>
+      <div className="verse-actions" aria-hidden={!active ? true : undefined}>
+        {canPlay && (
+          <button
+            type="button"
+            className="verse__play"
+            title={isPlaying ? 'Stop' : 'Play verse'}
+            aria-label={isPlaying ? 'Stop reading this verse' : 'Read this verse aloud'}
+            onClick={() => {
+              if (isPlaying) onStopTTS?.();
+              else onPlayTTS?.(text);
+            }}
+          >
+            {isPlaying ? <StopIcon size={13} /> : <PlayIcon size={13} />}
+          </button>
+        )}
+        {onCompare && (
+          <button
+            type="button"
+            className="verse__compare"
+            title="Compare in all translations"
+            aria-label={`Compare verse ${number} in all translations`}
+            onClick={onCompare}
+          >
+            <CompareIcon size={13} />
+          </button>
+        )}
+      </div>
+      <p
+        className={`verse${isPlaying ? ' verse--playing' : ''}${
+          isSelection ? ' verse--selection' : ''
+        }`}
+        data-verse-index={number - 1}
+      >
+        <span className="verse__number">{number}</span>
+        <span className="verse__text">{cleanVerseText(text)}</span>
+      </p>
+    </div>
   );
 }

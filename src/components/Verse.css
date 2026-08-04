@@ -1,6 +1,34 @@
-.verse {
+.verse-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin: 0 0 calc(var(--font-size-body) * 1.15);
+}
+
+/* --------------------------------------------------------------------------
+   Action rail: a reserved-width gutter that is part of the row's hover box,
+   so the cursor never crosses a gap that would drop the hover. The buttons
+   are absolutely positioned inside it, so they OVERLAY the text line and do
+   NOT contribute any height to the row (no extra spacing between verses).
+   -------------------------------------------------------------------------- */
+.verse-actions {
   position: relative;
-  margin: 0 0 1.15em;
+  flex-shrink: 0;
+  width: 26px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-fast);
+}
+
+.verse-row--active .verse-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.verse {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
   line-height: var(--line-height-body);
   font-size: var(--font-size-body);
   font-family: var(--font-body);
@@ -12,16 +40,14 @@
   background: var(--color-accent-soft);
   border-radius: var(--radius-sm);
   padding: 2px 8px;
-  margin-left: -8px;
-  margin-right: -8px;
+  margin: 0 -2px;
 }
 
 .verse--selection {
   background: var(--color-accent-soft);
   border-radius: var(--radius-sm);
   padding: 2px 8px;
-  margin-left: -8px;
-  margin-right: -8px;
+  margin: 0 -2px;
   opacity: 0.55;
 }
 
@@ -39,30 +65,14 @@
   word-break: break-word;
 }
 
-.verse__play {
-  position: absolute;
-  left: -44px;
-  top: 4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-accent);
-  box-shadow: var(--shadow-arrow);
-  transition: transform var(--transition-fast), background var(--transition-fast);
-}
-
+/* --------------------------------------------------------------------------
+   Buttons: absolutely positioned inside the rail so they overlay the first
+   line of the verse and never inflate the row height.
+   -------------------------------------------------------------------------- */
+.verse__play,
 .verse__compare {
   position: absolute;
-  left: -44px;
-  top: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  left: 0;
   width: 26px;
   height: 26px;
   border-radius: 50%;
@@ -70,7 +80,17 @@
   background: var(--color-surface);
   color: var(--color-text-muted);
   box-shadow: var(--shadow-arrow);
-  transition: transform var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+  transition: transform var(--transition-fast), background var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.verse__play {
+  top: 2px;
+  color: var(--color-accent);
+}
+
+.verse__compare {
+  top: 34px;
 }
 
 .verse__play:hover,
@@ -80,12 +100,20 @@
   color: #ffffff;
 }
 
-/* Narrow windows: keep the buttons in-flow so they never clip */
+/* Keyboard users can tab into the buttons too */
+.verse-actions:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* --------------------------------------------------------------------------
+   Narrow windows / touch: keep the buttons permanently visible (no hover on
+   touch). They stay absolutely positioned inside the rail so they overlay
+   the verse line instead of inflating row height.
+   -------------------------------------------------------------------------- */
 @media (max-width: 760px) {
-  .verse__play,
-  .verse__compare {
-    position: static;
-    margin-right: 8px;
-    vertical-align: middle;
+  .verse-actions {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
