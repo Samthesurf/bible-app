@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { PlayIcon, StopIcon } from './Icons';
+import { cleanVerseText } from '../utils/verseText';
 import './Verse.css';
 
 interface Props {
@@ -24,6 +25,7 @@ export default function Verse({
   const [hovered, setHovered] = useState(false);
 
   const showTTS = ttsAvailable && (hovered || isPlaying);
+  const displayText = cleanVerseText(text);
 
   return (
     <p
@@ -49,7 +51,7 @@ export default function Verse({
         </button>
       )}
       <span className="verse__number">{number}</span>
-      <span className="verse__text">{text}</span>
+      <span className="verse__text">{displayText}</span>
     </p>
   );
 }

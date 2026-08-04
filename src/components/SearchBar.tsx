@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useBible } from '../context/BibleContext';
 import type { SearchResult } from '../types/bible';
 import { SearchIcon } from './Icons';
+import { cleanVerseText } from '../utils/verseText';
 import './SearchBar.css';
 
 export default function SearchBar(): React.ReactElement {
@@ -100,7 +101,7 @@ export default function SearchBar(): React.ReactElement {
                 aria-selected={i === activeIndex}
               >
                 <span className="searchbar__ref">{r.reference}</span>
-                <span className="searchbar__text">{r.text}</span>
+                <span className="searchbar__text">{cleanVerseText(r.text)}</span>
               </button>
             ))
           )}

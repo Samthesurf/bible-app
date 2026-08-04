@@ -9,6 +9,12 @@ const OPENROUTER_TTS_URL = 'https://openrouter.ai/api/v1/audio/speech';
 const DEFAULT_MODEL = 'hexgrad/kokoro-82m';
 const DEFAULT_VOICE = 'af_heart';
 const DEFAULT_SPEED = 1.0;
+/** How many times to re-attempt a transient request failure before giving up. */
+const MAX_RETRIES = 4;
+/** Backoff for the first retry (ms); doubles each retry, with jitter. */
+const RETRY_BASE_MS = 500;
+/** Per-attempt timeout so a hung connection can't stall a whole chapter run. */
+const REQUEST_TIMEOUT_MS = 30_000;
 
 export interface KokoroConfig {
   apiKey: string;
@@ -126,6 +132,9 @@ export class KokoroTTSEngine implements TTSEngine {
     void task.finally(() => {
       this.prefetchFetches.delete(key);
     });
+    // Return the promise so callers can await the fetch (used to warm verse
+    // 0 before the loop); fire-and-forget callers may ignore it.
+    return task;
   }
 
   /** Fetch one verse's audio and store it in the sliding prefetch cache. */
@@ -158,12 +167,17 @@ export class KokoroTTSEngine implements TTSEngine {
   }
 
   async stop(): Promise<void> {
+    // NOTE: do NOT clear the prefetch cache here. speak() calls stop() on
+    // entry as a concurrency guard, and clearing would destroy the audio
+    // prefetched for the upcoming verses, forcing every verse into a cold
+    // fetch (the "1 verse, long wait, 1 verse, long wait" bug). The cache
+    // is text-keyed and self-evicting, so stale entries are harmless; it
+    // is fully cleared in cleanup() on quit.
     if (this.currentProcess) {
       const proc = this.currentProcess;
       this.currentProcess = null;
       proc.kill('SIGTERM');
     }
-    this.clearPrefetch();
     this.emitState({ status: 'idle' });
   }
 
@@ -202,31 +216,90 @@ export class KokoroTTSEngine implements TTSEngine {
     this.listener?.(state);
   }
 
+  /**
+   * Fetch TTS audio for `text` from OpenRouter, retrying transient failures.
+   *
+   * Retry policy: network/transport failures (DNS, connection refused, reset,
+   * timeout) and HTTP 429/5xx are retried up to MAX_RETRIES times with
+   * exponential backoff + jitter. Permanent 4xx errors (401 auth, 400, etc.)
+   * fail immediately. This prevents a brief network blip from aborting a
+   * whole chapter run.
+   */
   private async callAPI(text: string, voice: string, speed: number): Promise<Buffer> {
-    const response = await fetch(OPENROUTER_TTS_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://github.com/Samthesurf/bible-app',
-        'X-Title': 'Bible App TTS',
-      },
-      body: JSON.stringify({
-        model: DEFAULT_MODEL,
-        input: text,
-        voice,
-        response_format: 'mp3',
-        speed,
-      }),
-    });
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      throw new Error(`OpenRouter TTS API error ${response.status}: ${body.slice(0, 300)}`);
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        await this.delay(this.backoffMs(attempt));
+      }
+      try {
+        return await this.callAPISingle(text, voice, speed);
+      } catch (err) {
+        const e = err instanceof Error ? err : new Error(String(err));
+        if (!this.isRetryableRequestError(e) || attempt === MAX_RETRIES) {
+          throw e;
+        }
+        lastError = e;
+      }
     }
+    throw lastError ?? new Error('TTS request failed');
+  }
 
-    const arrayBuffer = await response.arrayBuffer();
-    return Buffer.from(arrayBuffer);
+  /** One raw HTTP attempt. No retry logic here. */
+  private async callAPISingle(text: string, voice: string, speed: number): Promise<Buffer> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const response = await fetch(OPENROUTER_TTS_URL, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://github.com/Samthesurf/bible-app',
+          'X-Title': 'Bible App TTS',
+        },
+        body: JSON.stringify({
+          model: DEFAULT_MODEL,
+          input: text,
+          voice,
+          response_format: 'mp3',
+          speed,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        const err = new Error(
+          `OpenRouter TTS API error ${response.status}: ${body.slice(0, 300)}`,
+        ) as Error & { status?: number };
+        err.status = response.status;
+        throw err;
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      return Buffer.from(arrayBuffer);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /** Whether a request failure is worth retrying (transient vs permanent). */
+  private isRetryableRequestError(err: Error): boolean {
+    // HTTP status errors carry a `status` property set in callAPISingle.
+    const status = (err as Error & { status?: number }).status;
+    if (typeof status === 'number') {
+      // 429 (rate limit) and 5xx (server-side) are transient.
+      return status === 429 || status >= 500;
+    }
+    // Everything else thrown by fetch (ECONNRESET, ENOTFOUND, ETIMEDOUT,
+    // "fetch failed", timeout AbortError) is a network/transport failure.
+    return true;
+  }
+
+  /** Exponential backoff with jitter: ~500ms, 1s, 2s, 4s for retries 1..4. */
+  private backoffMs(attempt: number): number {
+    const base = RETRY_BASE_MS * Math.pow(2, attempt - 1);
+    return Math.round(base * (0.8 + Math.random() * 0.4));
   }
 
   private playAudio(filePath: string): Promise<void> {

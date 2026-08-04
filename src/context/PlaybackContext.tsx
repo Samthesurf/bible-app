@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { cleanVerseText } from '../utils/verseText';
 
 export type PlaybackMode = 'idle' | 'chapter' | 'selection' | 'verse';
 
@@ -98,24 +99,29 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
       setVerseIndex(0);
       setSelection(null);
 
-      // Hot start: prefetch the first 4 verses in parallel before the loop.
-      // They all land while verse 0 is fetching/playing.
-      const hotStart = Math.min(4, verses.length);
-      for (let j = 0; j < hotStart; j += 1) {
-        void window.electronAPI.tts.prefetch(verses[j]);
+      // Strip cross-reference markers ([a], [b], ...) before speaking so the
+      // TTS engine never reads them aloud. The verse loop below is
+      // index-based, so cleaning up-front keeps highlight positions aligned.
+      const cleanVerses = verses.map(cleanVerseText);
+      const hotStart = Math.min(4, cleanVerses.length);
+      if (hotStart > 0) {
+        await window.electronAPI.tts.prefetch(cleanVerses[0]);
+      }
+      for (let j = 1; j < hotStart; j += 1) {
+        void window.electronAPI.tts.prefetch(cleanVerses[j]);
       }
 
-      for (let i = 0; i < verses.length; i += 1) {
+      for (let i = 0; i < cleanVerses.length; i += 1) {
         if (stopFlag.current) break;
         setVerseIndex(i);
         // Refill the sliding window: only the NEW tail verse (i+3) needs
         // fetching this step — i+1..i+3 are already cached or in flight.
         const tail = i + 3;
-        if (tail < verses.length) {
-          void window.electronAPI.tts.prefetch(verses[tail]);
+        if (tail < cleanVerses.length) {
+          void window.electronAPI.tts.prefetch(cleanVerses[tail]);
         }
         try {
-          await speakWithRetry(verses[i]);
+          await speakWithRetry(cleanVerses[i]);
         } catch (err) {
           if (stopFlag.current) break;
           setMode('idle');
@@ -148,7 +154,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
       setSelection(range);
 
       try {
-        await speakWithRetry(text);
+        await speakWithRetry(cleanVerseText(text));
       } catch (err) {
         if (!stopFlag.current) {
           showError(`Could not play selection: ${describeError(err)}`);
@@ -177,7 +183,7 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
       setSelection(null);
 
       try {
-        await speakWithRetry(text);
+        await speakWithRetry(cleanVerseText(text));
       } catch (err) {
         if (!stopFlag.current) {
           showError(`Could not play verse: ${describeError(err)}`);

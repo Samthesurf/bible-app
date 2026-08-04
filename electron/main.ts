@@ -204,7 +204,9 @@ function registerIpc(): void {
   ipcMain.handle('tts:speak', (_event, payload: { text: string }) => ttsEngine.speak(payload.text));
   ipcMain.handle('tts:prefetch', (_event, payload: { text: string }) => {
     if ('prefetch' in ttsEngine) {
-      void (ttsEngine as unknown as { prefetch: (t: string) => Promise<void> }).prefetch(payload.text);
+      // Return the promise (not void) so the renderer can await a verse's
+      // prefetch (e.g. verse 0 before the chapter loop starts).
+      return (ttsEngine as unknown as { prefetch: (t: string) => Promise<void> }).prefetch(payload.text);
     }
   });
   ipcMain.handle('tts:stop', () => ttsEngine.stop());
