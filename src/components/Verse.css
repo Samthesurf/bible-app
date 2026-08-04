@@ -56,15 +56,34 @@
   transition: transform var(--transition-fast), background var(--transition-fast);
 }
 
-.verse__play:hover {
+.verse__compare {
+  position: absolute;
+  left: -44px;
+  top: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  box-shadow: var(--shadow-arrow);
+  transition: transform var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+
+.verse__play:hover,
+.verse__compare:hover {
   transform: scale(1.12);
   background: var(--color-accent);
   color: #ffffff;
 }
 
-/* On narrow windows keep the play button in-flow so it never clips */
+/* Narrow windows: keep the buttons in-flow so they never clip */
 @media (max-width: 760px) {
-  .verse__play {
+  .verse__play,
+  .verse__compare {
     position: static;
     margin-right: 8px;
     vertical-align: middle;

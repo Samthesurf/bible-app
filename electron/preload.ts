@@ -9,6 +9,12 @@ const api = {
     getBookList: (abbr: string) => ipcRenderer.invoke('bible:get-book-list', abbr),
     search: (abbr: string, query: string, maxResults?: number) =>
       ipcRenderer.invoke('bible:search', { abbr, query, maxResults }),
+    getVerses: (
+      abbrs: string[],
+      bookIndex: number,
+      chapterIndex: number,
+      verseIndex: number,
+    ) => ipcRenderer.invoke('bible:get-verses', { abbrs, bookIndex, chapterIndex, verseIndex }),
   },
   tts: {
     isAvailable: () => ipcRenderer.invoke('tts:is-available'),

@@ -10,6 +10,7 @@ interface Props {
   onStopVerse?: () => void;
   playingVerse?: number | null;
   selectionHighlight?: { start: number; end: number } | null;
+  onCompareVerse?: (verseIndex: number, verseText: string) => void;
   className?: string;
   renderTitle?: boolean;
 }
@@ -21,6 +22,7 @@ export default function ChapterView({
   onStopVerse,
   playingVerse,
   selectionHighlight,
+  onCompareVerse,
   className = '',
   renderTitle = true,
 }: Props): React.ReactElement {
@@ -44,6 +46,7 @@ export default function ChapterView({
             onStopTTS={onStopVerse}
             isPlaying={playingVerse === i}
             isSelection={selectionHighlight ? i >= selectionHighlight.start && i <= selectionHighlight.end : false}
+            onCompare={onCompareVerse ? () => onCompareVerse(i, verseText) : undefined}
           />
         ))}
       </div>

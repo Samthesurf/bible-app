@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { useBible } from '../context/BibleContext';
+import { useCompare } from '../context/CompareContext';
 import { useChapter } from '../hooks/useChapter';
 import type { SelectionRange } from '../context/PlaybackContext';
 import ChapterView from './ChapterView';
@@ -38,6 +39,7 @@ export default function ParallelView({
     secondaryBookIndex,
     secondaryChapterIndex,
   } = useBible();
+  const { openCompare } = useCompare();
 
   const primary = useChapter(translationAbbr, bookIndex, chapterIndex);
 
@@ -89,6 +91,16 @@ export default function ParallelView({
             onPlayVerse={onPlayVerse}
             onStopVerse={onStopVerse}
             playingVerse={playingVerse}
+            onCompareVerse={(i, text) =>
+              openCompare({
+                reference: `${primary.chapter!.bookName} ${primary.chapter!.chapterNumber}:${i + 1}`,
+                bookIndex,
+                chapterIndex,
+                verseIndex: i,
+                currentAbbr: translationAbbr,
+                currentText: text,
+              })
+            }
             selectionHighlight={selection && selection.column !== 'secondary' ? { start: selection.start, end: selection.end } : null}
           />
         )}
@@ -110,6 +122,17 @@ export default function ParallelView({
             ttsAvailable={ttsAvailable}
             onPlayVerse={onPlayVerse}
             onStopVerse={onStopVerse}
+            playingVerse={playingVerse}
+            onCompareVerse={(i, text) =>
+              openCompare({
+                reference: `${secondary.chapter!.bookName} ${secondary.chapter!.chapterNumber}:${i + 1}`,
+                bookIndex: secondaryBook,
+                chapterIndex: secondaryChapter,
+                verseIndex: i,
+                currentAbbr: secondaryAbbrEffective,
+                currentText: text,
+              })
+            }
             selectionHighlight={selection && selection.column === 'secondary' ? { start: selection.start, end: selection.end } : null}
           />
         )}

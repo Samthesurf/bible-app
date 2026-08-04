@@ -1,4 +1,4 @@
-import type { ChapterData, BookMeta, SearchResult, TranslationMeta } from './bible';
+import type { ChapterData, BookMeta, SearchResult, TranslationMeta, CompareVerseEntry } from './bible';
 import type { TTSState } from './tts';
 
 declare global {
@@ -9,6 +9,12 @@ declare global {
         getChapter(abbr: string, bookIndex: number, chapterIndex: number): Promise<ChapterData>;
         getBookList(abbr: string): Promise<BookMeta[]>;
         search(abbr: string, query: string, maxResults?: number): Promise<SearchResult[]>;
+        getVerses(
+          abbrs: string[],
+          bookIndex: number,
+          chapterIndex: number,
+          verseIndex: number,
+        ): Promise<CompareVerseEntry[]>;
       };
       tts: {
         isAvailable(): Promise<boolean>;

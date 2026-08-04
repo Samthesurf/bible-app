@@ -42,6 +42,13 @@ export interface SearchResult {
   text: string;
 }
 
+export interface CompareVerseEntry {
+  abbr: string;
+  name: string;
+  copyright: string;
+  text: string;
+}
+
 export class BibleLoader {
   private readonly biblesPath: string;
   /** LRU cache: at most 2 full translations in memory (~8-10 MB each). */
@@ -110,6 +117,58 @@ export class BibleLoader {
       }
     }
     return results;
+  }
+
+  /**
+   * Fetches a single verse across many translations at once, without going
+   * through the LRU cache (which holds at most 2 full translations and would
+   * thrash if 50+ were pulled through it). Each translation is read from
+   * disk directly, so the reading view's cached translations stay warm.
+   *
+   * Runs with bounded concurrency to avoid reading 50+ files at once.
+   */
+  async getVerses(
+    abbrs: string[],
+    bookIndex: number,
+    chapterIndex: number,
+    verseIndex: number,
+  ): Promise<CompareVerseEntry[]> {
+    const CONCURRENCY = 4;
+    const entries: CompareVerseEntry[] = new Array(abbrs.length);
+    let next = 0;
+
+    const worker = async (): Promise<void> => {
+      while (next < abbrs.length) {
+        const i = next;
+        next += 1;
+        entries[i] = await this.getVerseUncached(abbrs[i], bookIndex, chapterIndex, verseIndex);
+      }
+    };
+
+    const workers = Array.from({ length: Math.min(CONCURRENCY, abbrs.length) }, () => worker());
+    await Promise.all(workers);
+    return entries;
+  }
+
+  /** Reads a single translation from disk and extracts one verse. */
+  private async getVerseUncached(
+    abbr: string,
+    bookIndex: number,
+    chapterIndex: number,
+    verseIndex: number,
+  ): Promise<CompareVerseEntry> {
+    const raw = await fs.readFile(path.join(this.biblesPath, `${abbr}.json`), 'utf-8');
+    const data = JSON.parse(raw) as BibleTranslation;
+    const book = data.books[bookIndex];
+    if (!book) return { abbr, name: data.name, copyright: data.copyright, text: '' };
+    const chapter = book.chapters[chapterIndex];
+    if (!chapter) return { abbr, name: data.name, copyright: data.copyright, text: '' };
+    return {
+      abbr,
+      name: data.name,
+      copyright: data.copyright,
+      text: chapter[verseIndex] ?? '',
+    };
   }
 
   private async load(abbr: string): Promise<BibleTranslation> {

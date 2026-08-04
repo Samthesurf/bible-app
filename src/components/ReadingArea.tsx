@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useBible } from '../context/BibleContext';
 import { usePlayback } from '../context/PlaybackContext';
+import { useCompare } from '../context/CompareContext';
 import { useChapter } from '../hooks/useChapter';
 import { useKeyboardNav } from '../hooks/useKeyboardNav';
 import ChapterView from './ChapterView';
@@ -17,6 +18,7 @@ export default function ReadingArea(): React.ReactElement {
   const { translationAbbr, bookIndex, chapterIndex, bookList, parallelEnabled, nextChapter, prevChapter } =
     useBible();
   const playback = usePlayback();
+  const { openCompare } = useCompare();
   const { chapter, loading, error } = useChapter(translationAbbr, bookIndex, chapterIndex);
 
   const [ttsAvailable, setTtsAvailable] = useState(false);
@@ -75,6 +77,16 @@ export default function ReadingArea(): React.ReactElement {
             onPlayVerse={(i, text) => void playback.playVerse(bookIndex, chapterIndex, i, text)}
             onStopVerse={() => void playback.stop()}
             playingVerse={playingVerse}
+            onCompareVerse={(i, text) =>
+              openCompare({
+                reference: `${chapter.bookName} ${chapter.chapterNumber}:${i + 1}`,
+                bookIndex,
+                chapterIndex,
+                verseIndex: i,
+                currentAbbr: translationAbbr,
+                currentText: text,
+              })
+            }
             selectionHighlight={
               playback.mode === 'selection' && playback.selection && playback.selection.column !== 'secondary'
                 ? { start: playback.selection.start, end: playback.selection.end }

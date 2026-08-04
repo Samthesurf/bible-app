@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlayIcon, StopIcon } from './Icons';
+import { PlayIcon, StopIcon, CompareIcon } from './Icons';
 import { cleanVerseText } from '../utils/verseText';
 import './Verse.css';
 
@@ -11,6 +11,7 @@ interface Props {
   onStopTTS?: () => void;
   isPlaying?: boolean;
   isSelection?: boolean;
+  onCompare?: () => void;
 }
 
 export default function Verse({
@@ -21,6 +22,7 @@ export default function Verse({
   onStopTTS,
   isPlaying,
   isSelection,
+  onCompare,
 }: Props): React.ReactElement {
   const [hovered, setHovered] = useState(false);
 
@@ -48,6 +50,17 @@ export default function Verse({
           }}
         >
           {isPlaying ? <StopIcon size={14} /> : <PlayIcon size={14} />}
+        </button>
+      )}
+      {onCompare && hovered && (
+        <button
+          type="button"
+          className="verse__compare"
+          title="Compare in all translations"
+          aria-label={`Compare ${number} in all translations`}
+          onClick={onCompare}
+        >
+          <CompareIcon size={14} />
         </button>
       )}
       <span className="verse__number">{number}</span>

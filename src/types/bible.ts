@@ -31,3 +31,10 @@ export interface SearchResult {
   reference: string;
   text: string;
 }
+
+export interface CompareVerseEntry {
+  abbr: string;
+  name: string;
+  copyright: string;
+  text: string;
+}

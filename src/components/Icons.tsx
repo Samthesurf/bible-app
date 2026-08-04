@@ -103,3 +103,20 @@ export const SplitChaptersIcon = ({ size, className }: IconProps) => (
     <rect width="7" height="18" x="14" y="3" rx="1.5" />
   </svg>
 );
+
+/** Compare-across-versions icon (two rows of text against a scale). */
+export const CompareIcon = ({ size, className }: IconProps) => (
+  <svg {...base(size, className)}>
+    <path d="m16 3 5 5-5 5" />
+    <path d="M21 8H9" />
+    <path d="m8 13-5 5 5 5" />
+    <path d="M3 18h12" />
+  </svg>
+);
+
+export const CloseIcon = ({ size, className }: IconProps) => (
+  <svg {...base(size, className)}>
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
+  </svg>
+);

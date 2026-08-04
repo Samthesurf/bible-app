@@ -194,6 +194,19 @@ function registerIpc(): void {
       bibleLoader.search(payload.abbr, payload.query, payload.maxResults ?? 50),
   );
 
+  ipcMain.handle(
+    'bible:get-verses',
+    (
+      _event,
+      payload: {
+        abbrs: string[];
+        bookIndex: number;
+        chapterIndex: number;
+        verseIndex: number;
+      },
+    ) => bibleLoader.getVerses(payload.abbrs, payload.bookIndex, payload.chapterIndex, payload.verseIndex),
+  );
+
   ipcMain.handle('tts:is-available', () => ttsEngine.isAvailable());
   ipcMain.handle('tts:get-stats', () => {
     if ('getStats' in ttsEngine) {
