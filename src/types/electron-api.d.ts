@@ -14,7 +14,11 @@ declare global {
           bookIndex: number,
           chapterIndex: number,
           verseIndex: number,
-        ): Promise<CompareVerseEntry[]>;
+          requestId: string,
+        ): Promise<{ requestId: string; entries: CompareVerseEntry[] }>;
+        onVersesProgress(
+          callback: (payload: { requestId: string; index: number; entry: CompareVerseEntry }) => void,
+        ): () => void;
       };
       tts: {
         isAvailable(): Promise<boolean>;

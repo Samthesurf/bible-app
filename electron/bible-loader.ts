@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { VerseWorkerPool } from './verse-workers';
 
 export interface TranslationMeta {
   abbr: string;
@@ -55,9 +56,24 @@ export class BibleLoader {
   private readonly cache = new Map<string, BibleTranslation>();
   private readonly MAX_CACHE = 2;
   private catalog: TranslationMeta[] | null = null;
+  /** Worker pool that owns long-lived parsed translations for comparisons. */
+  private readonly workerPool: VerseWorkerPool;
 
   constructor(biblesPath: string) {
     this.biblesPath = biblesPath;
+    this.workerPool = new VerseWorkerPool(biblesPath);
+  }
+
+  /** Pre-parse every translation into the worker pool in the background. */
+  prewarmAll(): void {
+    void this.getCatalog().then((catalog) => {
+      for (const t of catalog) this.workerPool.prewarm(t.abbr);
+    });
+  }
+
+  dispose(): void {
+    this.workerPool.dispose();
+    this.cache.clear();
   }
 
   async getCatalog(): Promise<TranslationMeta[]> {
@@ -120,55 +136,49 @@ export class BibleLoader {
   }
 
   /**
-   * Fetches a single verse across many translations at once, without going
-   * through the LRU cache (which holds at most 2 full translations and would
-   * thrash if 50+ were pulled through it). Each translation is read from
-   * disk directly, so the reading view's cached translations stay warm.
+   * Fetches a single verse across many translations at once, using a worker
+   * pool that caches every parsed translation for the session. Each
+   * translation is parsed exactly once (parallel across CPU cores), so the
+   * first compare warms the pool and every later look-up is in-memory.
    *
-   * Runs with bounded concurrency to avoid reading 50+ files at once.
+   * Results are delivered top-to-bottom via the optional onEntry callback as
+   * soon as each translation resolves, so the UI fills progressively instead
+   * of waiting for all 56 files.
    */
   async getVerses(
     abbrs: string[],
     bookIndex: number,
     chapterIndex: number,
     verseIndex: number,
+    onEntry?: (index: number, entry: CompareVerseEntry) => void,
   ): Promise<CompareVerseEntry[]> {
-    const CONCURRENCY = 4;
     const entries: CompareVerseEntry[] = new Array(abbrs.length);
-    let next = 0;
 
-    const worker = async (): Promise<void> => {
-      while (next < abbrs.length) {
-        const i = next;
-        next += 1;
-        entries[i] = await this.getVerseUncached(abbrs[i], bookIndex, chapterIndex, verseIndex);
-      }
-    };
+    const jobs = abbrs.map((abbr, index) =>
+      this.workerPool
+        .getVerse(abbr, bookIndex, chapterIndex, verseIndex)
+        .then((entry) => {
+          entries[index] = entry;
+        })
+        .catch(() => {
+          entries[index] = { abbr, name: abbr, copyright: '', text: '' };
+        }),
+    );
 
-    const workers = Array.from({ length: Math.min(CONCURRENCY, abbrs.length) }, () => worker());
-    await Promise.all(workers);
+    // Emit in index order as leading slots fill: whenever any job resolves,
+    // flush the now-complete contiguous prefix so the UI fills top to bottom.
+    let nextToEmit = 0;
+    await Promise.all(
+      jobs.map((job) =>
+        job.then(() => {
+          while (nextToEmit < entries.length && entries[nextToEmit]) {
+            onEntry?.(nextToEmit, entries[nextToEmit]);
+            nextToEmit += 1;
+          }
+        }),
+      ),
+    );
     return entries;
-  }
-
-  /** Reads a single translation from disk and extracts one verse. */
-  private async getVerseUncached(
-    abbr: string,
-    bookIndex: number,
-    chapterIndex: number,
-    verseIndex: number,
-  ): Promise<CompareVerseEntry> {
-    const raw = await fs.readFile(path.join(this.biblesPath, `${abbr}.json`), 'utf-8');
-    const data = JSON.parse(raw) as BibleTranslation;
-    const book = data.books[bookIndex];
-    if (!book) return { abbr, name: data.name, copyright: data.copyright, text: '' };
-    const chapter = book.chapters[chapterIndex];
-    if (!chapter) return { abbr, name: data.name, copyright: data.copyright, text: '' };
-    return {
-      abbr,
-      name: data.name,
-      copyright: data.copyright,
-      text: chapter[verseIndex] ?? '',
-    };
   }
 
   private async load(abbr: string): Promise<BibleTranslation> {

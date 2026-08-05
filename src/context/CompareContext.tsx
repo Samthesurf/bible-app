@@ -23,15 +23,19 @@ interface CompareState {
 
 const CompareContext = createContext<CompareState | null>(null);
 
+let requestSeq = 0;
+
 export function CompareProvider({ children }: { children: React.ReactNode }): React.ReactElement {
   const { catalog } = useBible();
   const [verse, setVerse] = useState<CompareVerse | null>(null);
   const [entries, setEntries] = useState<CompareVerseEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const requestIdRef = useRef(0);
+  const requestIdRef = useRef<string | null>(null);
+  const entriesRef = useRef<CompareVerseEntry[] | null>(null);
 
   const closeCompare = useCallback(() => {
-    requestIdRef.current += 1; // invalidate any in-flight fetch
+    requestIdRef.current = null;
+    entriesRef.current = null;
     setVerse(null);
     setEntries(null);
     setLoading(false);
@@ -40,10 +44,8 @@ export function CompareProvider({ children }: { children: React.ReactNode }): Re
   const openCompare = useCallback(
     (v: CompareVerse) => {
       if (!catalog.length) return;
-      const requestId = ++requestIdRef.current;
-      setVerse(v);
-      setLoading(true);
-      setEntries(null);
+      const requestId = `cmp-${++requestSeq}`;
+      requestIdRef.current = requestId;
 
       // Instant row for the current translation from the already-loaded chapter.
       const currentEntry: CompareVerseEntry = {
@@ -53,20 +55,49 @@ export function CompareProvider({ children }: { children: React.ReactNode }): Re
         text: v.currentText,
       };
 
+      // Pre-allocate the full array so progressive entries fill top-to-bottom.
+      const slots: (CompareVerseEntry | null)[] = new Array(catalog.length).fill(null);
+      setVerse(v);
+      setEntries(slots as CompareVerseEntry[]);
+      setLoading(true);
+
+      const apply = (index: number, entry: CompareVerseEntry) => {
+        if (requestIdRef.current !== requestId) return; // stale request
+        slots[index] = entry;
+        setEntries([...slots] as CompareVerseEntry[]);
+      };
+
+      // Stream from the main process as translations resolve.
+      const unsubscribe = window.electronAPI.bible.onVersesProgress(({ requestId: rid, index, entry }) => {
+        if (rid !== requestId) return;
+        apply(index, entry);
+      });
+
       const abbrs = catalog.map((t) => t.abbr);
       void window.electronAPI.bible
-        .getVerses(abbrs, v.bookIndex, v.chapterIndex, v.verseIndex)
-        .then((loaded) => {
-          if (requestId !== requestIdRef.current) return; // stale
-          setEntries(loaded);
+        .getVerses(abbrs, v.bookIndex, v.chapterIndex, v.verseIndex, requestId)
+        .then(({ entries: loaded }) => {
+          if (requestIdRef.current !== requestId) {
+            unsubscribe();
+            return;
+          }
+          // Ensure every slot is filled (belt and braces after streaming).
+          const final = [...loaded];
+          setEntries(final);
           setLoading(false);
+          unsubscribe();
         })
-        .catch((err: unknown) => {
-          if (requestId !== requestIdRef.current) return;
-          console.error('COMPARE-GET-VERSES-FAILED:', err instanceof Error ? err.message : String(err));
+        .catch(() => {
+          if (requestIdRef.current !== requestId) {
+            unsubscribe();
+            return;
+          }
           // Fall back to just the current verse on failure.
-          setEntries([currentEntry]);
+          const fallback: (CompareVerseEntry | null)[] = new Array(catalog.length).fill(null);
+          fallback[0] = currentEntry;
+          setEntries(fallback as CompareVerseEntry[]);
           setLoading(false);
+          unsubscribe();
         });
     },
     [catalog],
@@ -90,12 +121,7 @@ export function CompareProvider({ children }: { children: React.ReactNode }): Re
   return (
     <CompareContext.Provider value={value}>
       {children}
-      <CompareVersions
-        verse={verse}
-        entries={entries}
-        loading={loading}
-        onClose={closeCompare}
-      />
+      <CompareVersions verse={verse} entries={entries} loading={loading} onClose={closeCompare} />
     </CompareContext.Provider>
   );
 }

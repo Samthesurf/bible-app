@@ -14,7 +14,14 @@ const api = {
       bookIndex: number,
       chapterIndex: number,
       verseIndex: number,
-    ) => ipcRenderer.invoke('bible:get-verses', { abbrs, bookIndex, chapterIndex, verseIndex }),
+      requestId: string,
+    ) => ipcRenderer.invoke('bible:get-verses', { abbrs, bookIndex, chapterIndex, verseIndex, requestId }),
+    onVersesProgress: (callback: (payload: { requestId: string; index: number; entry: unknown }) => void) => {
+      const listener = (_event: unknown, payload: { requestId: string; index: number; entry: unknown }) =>
+        callback(payload);
+      ipcRenderer.on('bible:verses-progress', listener);
+      return () => ipcRenderer.removeListener('bible:verses-progress', listener);
+    },
   },
   tts: {
     isAvailable: () => ipcRenderer.invoke('tts:is-available'),

@@ -196,6 +196,42 @@
   border-radius: var(--radius-md);
 }
 
+/* Pending (still loading) card: subtle shimmering placeholder row */
+.compare-sheet__entry--pending {
+  display: block;
+  min-height: 96px;
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border);
+  overflow: hidden;
+}
+
+.compare-sheet__badge--pending {
+  display: inline-block;
+  width: 34px;
+  height: 18px;
+  border: none;
+  background: var(--color-surface-hover);
+  animation: skeleton-shimmer 1.4s infinite;
+}
+
+.compare-sheet__pending-name {
+  display: inline-block;
+  width: 140px;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--color-surface-hover);
+  animation: skeleton-shimmer 1.4s infinite;
+  vertical-align: middle;
+}
+
+.compare-sheet__pending-text {
+  margin-top: 10px;
+  height: 13px;
+  border-radius: 4px;
+  background: var(--color-surface-hover);
+  animation: skeleton-shimmer 1.4s infinite;
+}
+
 .compare-sheet__skeleton {
   display: inline-block;
   height: 13px;

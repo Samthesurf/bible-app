@@ -196,15 +196,26 @@ function registerIpc(): void {
 
   ipcMain.handle(
     'bible:get-verses',
-    (
-      _event,
+    async (
+      event,
       payload: {
         abbrs: string[];
         bookIndex: number;
         chapterIndex: number;
         verseIndex: number;
+        requestId: string;
       },
-    ) => bibleLoader.getVerses(payload.abbrs, payload.bookIndex, payload.chapterIndex, payload.verseIndex),
+    ) => {
+      const entries = await bibleLoader.getVerses(
+        payload.abbrs,
+        payload.bookIndex,
+        payload.chapterIndex,
+        payload.verseIndex,
+        (index, entry) => event.sender.send('bible:verses-progress', { requestId: payload.requestId, index, entry }),
+      );
+      // Final flush: renderer can also just rely on the resolved array.
+      return { requestId: payload.requestId, entries };
+    },
   );
 
   ipcMain.handle('tts:is-available', () => ttsEngine.isAvailable());
@@ -256,6 +267,10 @@ if (!gotLock) {
   app.whenReady().then(() => {
     registerIpc();
 
+    // Warm the worker pool in the background so the first verse comparison
+    // is already fast (translations parse once, then stay in memory).
+    setTimeout(() => bibleLoader.prewarmAll(), 1500);
+
     if (app.isPackaged) {
       // Strict CSP for the packaged build; Vite dev needs relaxed headers.
       session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -283,6 +298,7 @@ if (!gotLock) {
 
   // Clean up TTS temp files on quit
   app.on('before-quit', () => {
+    bibleLoader.dispose();
     if ('cleanup' in ttsEngine) {
       (ttsEngine as KokoroTTSEngine).cleanup();
     }
