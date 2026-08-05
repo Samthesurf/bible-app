@@ -17,6 +17,9 @@ interface CompareState {
   verse: CompareVerse | null;
   entries: CompareVerseEntry[] | null;
   loading: boolean;
+  /** Explicitly chosen translations, or null = show all. */
+  compareAbbrs: string[] | null;
+  setCompareAbbrs: (abbrs: string[] | null) => void;
   openCompare: (verse: CompareVerse) => void;
   closeCompare: () => void;
 }
@@ -30,8 +33,28 @@ export function CompareProvider({ children }: { children: React.ReactNode }): Re
   const [verse, setVerse] = useState<CompareVerse | null>(null);
   const [entries, setEntries] = useState<CompareVerseEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [compareAbbrs, setCompareAbbrsState] = useState<string[] | null>(null);
+  const [selectionLoaded, setSelectionLoaded] = useState(false);
   const requestIdRef = useRef<string | null>(null);
   const entriesRef = useRef<CompareVerseEntry[] | null>(null);
+
+  // Restore the chosen translation set from the persisted store (if any).
+  useEffect(() => {
+    let cancelled = false;
+    void window.electronAPI.store.get<string[]>('compareSelectedAbbrs').then((saved) => {
+      if (cancelled) return;
+      if (Array.isArray(saved) && saved.length > 0) setCompareAbbrsState(saved);
+      setSelectionLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const setCompareAbbrs = useCallback((abbrs: string[] | null) => {
+    setCompareAbbrsState(abbrs);
+    if (selectionLoaded) void window.electronAPI.store.set('compareSelectedAbbrs', abbrs);
+  }, [selectionLoaded]);
 
   const closeCompare = useCallback(() => {
     requestIdRef.current = null;
@@ -114,8 +137,8 @@ export function CompareProvider({ children }: { children: React.ReactNode }): Re
   }, [verse, closeCompare]);
 
   const value = useMemo<CompareState>(
-    () => ({ verse, entries, loading, openCompare, closeCompare }),
-    [verse, entries, loading, openCompare, closeCompare],
+    () => ({ verse, entries, loading, compareAbbrs, setCompareAbbrs, openCompare, closeCompare }),
+    [verse, entries, loading, compareAbbrs, setCompareAbbrs, openCompare, closeCompare],
   );
 
   return (

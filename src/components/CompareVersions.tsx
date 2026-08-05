@@ -1,7 +1,10 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useBible } from '../context/BibleContext';
+import { useCompare } from '../context/CompareContext';
 import type { CompareVerseEntry } from '../types/bible';
 import type { CompareVerse } from '../context/CompareContext';
-import { CloseIcon } from './Icons';
+import { CloseIcon, ChevronDown } from './Icons';
+import CompareTranslationPicker from './CompareTranslationPicker';
 import './CompareVersions.css';
 
 interface Props {
@@ -12,19 +15,55 @@ interface Props {
 }
 
 /**
- * Full-height, scrollable modal comparing one verse across every available
- * translation. Entries stream in top-to-bottom as each translation resolves
- * (worker pool in the main process), so the list fills progressively instead
- * of waiting for all files. The current translation is highlighted.
+ * Full-height, scrollable modal comparing one verse across translations.
+ * Entries stream in top-to-bottom as each translation resolves (worker pool
+ * in the main process), so the list fills progressively. A header control
+ * lets the user pick which translations to show; the selection persists.
+ * The current translation is highlighted.
  * Renders nothing until a verse is opened via useCompare().openCompare().
  */
 export default function CompareVersions({ verse, entries, loading, onClose }: Props): React.ReactElement | null {
+  const { catalog } = useBible();
+  const { compareAbbrs, setCompareAbbrs } = useCompare();
+  const [pickerOpen, setPickerOpen] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   // Focus the close button on open so keyboard users land in the dialog.
   useEffect(() => {
     if (verse) closeRef.current?.focus();
   }, [verse]);
+
+  // Close the picker when the dialog closes.
+  useEffect(() => {
+    if (!verse) setPickerOpen(false);
+  }, [verse]);
+
+  const selected = useMemo(() => {
+    const set = new Set(compareAbbrs ?? catalog.map((t) => t.abbr));
+    // Always keep the entry we have loaded data for in range.
+    return set;
+  }, [compareAbbrs, catalog]);
+
+  const toggle = (abbr: string) => {
+    const next = new Set(selected);
+    if (next.has(abbr)) next.delete(abbr);
+    else next.add(abbr);
+    setCompareAbbrs(next.size === catalog.length ? null : [...next]);
+  };
+
+  const showAll = () => setCompareAbbrs(null);
+  const clear = () => setCompareAbbrs([]);
+
+  // Filter the streamed slots by the selected translations. Pending slots
+  // remain for selected-but-not-yet-loaded translations (shimmer cards).
+  // NOTE: computed before the early return so hook order is stable.
+  const visibleSlots = useMemo(() => {
+    if (!entries) return null;
+    return entries
+      .map((entry, i) => ({ entry, abbr: catalog[i]?.abbr ?? '' }))
+      .filter(({ abbr }) => selected.has(abbr))
+      .map(({ entry }) => entry);
+  }, [entries, catalog, selected]);
 
   if (!verse) return null;
 
@@ -90,27 +129,61 @@ export default function CompareVersions({ verse, entries, loading, onClose }: Pr
             <span className="compare-sheet__reference">{verse.reference}</span>
             <span className="compare-sheet__subtitle">in every translation</span>
           </div>
-          <button
-            ref={closeRef}
-            type="button"
-            className="compare-sheet__close icon-btn"
-            onClick={onClose}
-            aria-label="Close comparison"
-            title="Close (Esc)"
-          >
-            <CloseIcon size={18} />
-          </button>
+
+          <div className="compare-sheet__header-actions">
+            <div className="compare-picker-anchor">
+              <button
+                type="button"
+                className={`compare-sheet__picker${pickerOpen ? ' compare-sheet__picker--open' : ''}`}
+                onClick={() => setPickerOpen((o) => !o)}
+                aria-expanded={pickerOpen}
+                aria-haspopup="dialog"
+                title="Choose translations to compare"
+              >
+                <span className="compare-sheet__picker-count">{selected.size}</span>
+                <span className="compare-sheet__picker-label">
+                  {selected.size === catalog.length ? 'versions' : 'selected'}
+                </span>
+                <ChevronDown size={14} className="compare-sheet__picker-chevron" />
+              </button>
+              {pickerOpen && (
+                <CompareTranslationPicker
+                  catalog={catalog}
+                  selected={selected}
+                  onToggle={toggle}
+                  onShowAll={showAll}
+                  onClear={clear}
+                  onClose={() => setPickerOpen(false)}
+                />
+              )}
+            </div>
+
+            <button
+              ref={closeRef}
+              type="button"
+              className="compare-sheet__close icon-btn"
+              onClick={onClose}
+              aria-label="Close comparison"
+              title="Close (Esc)"
+            >
+              <CloseIcon size={18} />
+            </button>
+          </div>
         </header>
 
         <div className="compare-sheet__body">
-          {!entries ? (
+          {!visibleSlots ? (
             <div className="compare-sheet__loading" aria-label="Loading translations">
               {Array.from({ length: 12 }, (_, i) => (
                 <div key={i} className="compare-sheet__skeleton" style={{ width: `${88 - (i % 4) * 9}%` }} />
               ))}
             </div>
+          ) : visibleSlots.length === 0 ? (
+            <div className="compare-sheet__empty" role="status">
+              No translations selected. Open the picker above and choose some to compare.
+            </div>
           ) : (
-            entries.map((entry, i) => renderCard(entry, i))
+            visibleSlots.map((entry, i) => renderCard(entry, i))
           )}
 
           {loading && (
