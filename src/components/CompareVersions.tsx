@@ -116,13 +116,21 @@ export default function CompareVersions({ verse, entries, loading, onClose }: Pr
   };
 
   return (
-    <div className="compare-overlay" role="presentation" onMouseDown={onClose}>
+    <div
+      className="compare-overlay"
+      role="presentation"
+      onMouseDown={(e) => {
+        // Close only when the backdrop itself is clicked, not when the click
+        // bubbled up from inside the sheet. (No stopPropagation here so the
+        // picker can receive outside-clicks.)
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
       <div
         className="compare-sheet"
         role="dialog"
         aria-modal="true"
         aria-label={`Compare ${verse.reference} across translations`}
-        onMouseDown={(e) => e.stopPropagation()}
       >
         <header className="compare-sheet__header">
           <div className="compare-sheet__title">
