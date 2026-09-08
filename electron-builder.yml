@@ -19,4 +19,12 @@ linux:
     - AppImage
   category: Education
   icon: build/icon.png
+win:
+  target:
+    - nsis
+    - portable
+  icon: build/icon.ico
+nsis:
+  oneClick: true
+  perMachine: false
 npmRebuild: false

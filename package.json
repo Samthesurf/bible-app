@@ -12,7 +12,9 @@
     "start": "npm run build:electron && electron .",
     "dev:electron": "npm run build:electron && (npm run dev &) && sleep 3 && electron .",
     "build": "npm run build:electron && npm run build:renderer && electron-builder",
-    "build:dir": "npm run build:electron && npm run build:renderer && electron-builder --dir"
+    "build:dir": "npm run build:electron && npm run build:renderer && electron-builder --dir",
+    "build:win": "npm run build:electron && npm run build:renderer && electron-builder --win",
+    "build:linux": "npm run build:electron && npm run build:renderer && electron-builder --linux"
   },
   "dependencies": {
     "react": "^19.0.0",
