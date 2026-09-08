@@ -19,6 +19,9 @@ linux:
     - AppImage
   category: Education
   icon: build/icon.png
+  # Name the .desktop entry after package.json#desktopName so its
+  # StartupWMClass matches the app_id Electron sets on Wayland.
+  syncDesktopName: true
 win:
   target:
     - nsis

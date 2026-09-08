@@ -30,9 +30,12 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 9px;
-  background: var(--color-accent);
-  color: #ffffff;
+}
+
+.header__logo-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .header__logo-text {

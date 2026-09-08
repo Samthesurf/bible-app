@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookIcon, UserIcon } from './Icons';
+import { UserIcon } from './Icons';
 import SearchBar from './SearchBar';
 import './Header.css';
 
@@ -14,7 +14,7 @@ export default function Header(): React.ReactElement {
       <div className="header__left">
         <div className="header__logo">
           <span className="header__logo-icon">
-            <BookIcon size={20} />
+            <img src="logo.png" alt="" width={32} height={32} />
           </span>
           <span className="header__logo-text">Bible App</span>
         </div>

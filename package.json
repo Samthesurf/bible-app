@@ -5,6 +5,7 @@
   "main": "dist-electron/main.js",
   "author": "Samuel Ukpai",
   "license": "MIT",
+  "desktopName": "bible-app",
   "scripts": {
     "dev": "vite",
     "build:renderer": "vite build",

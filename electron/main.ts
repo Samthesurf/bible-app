@@ -91,6 +91,22 @@ function getBiblesPath(): string {
   return path.join(app.getAppPath(), 'bibles');
 }
 
+/**
+ * Window/taskbar icon. In packaged Linux builds electron-builder installs
+ * build/icon.png as bible-app.png beside the executable; in dev fall back
+ * to the repo copy. Wayland taskbars ignore this hint and use the app_id,
+ * so packaged builds must also ship a .desktop entry whose StartupWMClass
+ * matches package.json#desktopName.
+ */
+function getIconPath(): string {
+  const iconBasename = 'bible-app.png';
+  if (app.isPackaged) {
+    const installed = path.join(path.dirname(process.execPath), iconBasename);
+    if (fs.existsSync(installed)) return installed;
+  }
+  return path.join(__dirname, '../../build', iconBasename);
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: Number(process.env.DEBUG_WIDTH ?? 1280),
@@ -100,6 +116,9 @@ function createWindow(): void {
     backgroundColor: '#fcfcfc',
     title: 'Bible App',
     autoHideMenuBar: true,
+    // Window icon: in packaged builds electron-builder copies build/icon.png
+    // next to the executable; in dev, fall back to the repo copy.
+    icon: getIconPath(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
