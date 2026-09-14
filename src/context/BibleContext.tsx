@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { BookMeta, TranslationMeta } from '../types/bible';
+import { loadAllSettings } from '../lib/settingsHydration';
 
 type ParallelMode = 'translations' | 'chapters';
 
@@ -42,82 +43,76 @@ export function BibleProvider({ children }: { children: React.ReactNode }) {
   const [secondaryBookIndex, setSecondaryBookIndex] = useState(0);
   const [secondaryChapterIndex, setSecondaryChapterIndex] = useState(1);
 
-  const hydrated = useRef(false);
+  const hydratedRef = useRef(false);
 
-  // Load catalog once
+  // Load catalog + restore ALL persisted position state in parallel, in ONE
+  // store round trip. Children (reading area etc.) mount only after this
+  // resolves, so nothing fetches a chapter with defaults that are about to
+  // change (no double parse, no wrong-content flash).
+  const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    void window.electronAPI.bible.getCatalog().then((c) => {
-      if (!cancelled) {
-        setCatalog(c);
-        setCatalogLoaded(true);
-      }
+    const catalogPromise = window.electronAPI.bible.getCatalog();
+    const settingsPromise = loadAllSettings().catch(() => ({}) as Record<string, unknown>);
+    void Promise.all([catalogPromise, settingsPromise]).then(([c, all]) => {
+      if (cancelled) return;
+      hydratedRef.current = true;
+      setCatalog(c);
+      setCatalogLoaded(true);
+      const abbr = all.translationAbbr;
+      if (typeof abbr === 'string' && abbr) setTranslationAbbr(abbr);
+      if (typeof all.bookIndex === 'number') setBookIndex(all.bookIndex);
+      if (typeof all.chapterIndex === 'number') setChapterIndex(all.chapterIndex);
+      if (all.parallelMode === 'translations' || all.parallelMode === 'chapters') setParallelModeState(all.parallelMode);
+      if (typeof all.secondaryAbbr === 'string' && all.secondaryAbbr) setSecondaryAbbr(all.secondaryAbbr);
+      if (typeof all.secondaryBookIndex === 'number') setSecondaryBookIndex(all.secondaryBookIndex);
+      if (typeof all.secondaryChapterIndex === 'number') setSecondaryChapterIndex(all.secondaryChapterIndex);
+      setHydrated(true);
     });
     return () => { cancelled = true; };
   }, []);
 
-  // Load book list for the current translation
+  // Load book list for the current translation (worker-parsed, off main).
+  // Gated on hydration: children are not mounted yet, so the only consumer
+  // is this fetch - waiting avoids parsing KJV when a different translation
+  // was saved and is about to become current.
   useEffect(() => {
+    if (!hydrated) return;
     let cancelled = false;
     setBookList(null);
     void window.electronAPI.bible.getBookList(translationAbbr).then((books) => {
       if (!cancelled) setBookList(books);
     });
     return () => { cancelled = true; };
-  }, [translationAbbr]);
-
-  // Restore all persisted state once
-  useEffect(() => {
-    let cancelled = false;
-    void Promise.all([
-      window.electronAPI.store.get<string>('translationAbbr'),
-      window.electronAPI.store.get<number>('bookIndex'),
-      window.electronAPI.store.get<number>('chapterIndex'),
-      window.electronAPI.store.get<string>('parallelMode'),
-      window.electronAPI.store.get<string>('secondaryAbbr'),
-      window.electronAPI.store.get<number>('secondaryBookIndex'),
-      window.electronAPI.store.get<number>('secondaryChapterIndex'),
-    ]).then(([abbr, book, chapter, pm, secAbbr, secBook, secChap]) => {
-      if (cancelled) return;
-      if (abbr) setTranslationAbbr(abbr);
-      if (typeof book === 'number') setBookIndex(book);
-      if (typeof chapter === 'number') setChapterIndex(chapter);
-      if (pm === 'translations' || pm === 'chapters') setParallelModeState(pm);
-      if (secAbbr) setSecondaryAbbr(secAbbr);
-      if (typeof secBook === 'number') setSecondaryBookIndex(secBook);
-      if (typeof secChap === 'number') setSecondaryChapterIndex(secChap);
-      hydrated.current = true;
-    });
-    return () => { cancelled = true; };
-  }, []);
+  }, [translationAbbr, hydrated]);
 
   // Persist position on change (only after hydration)
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydratedRef.current) return;
     void window.electronAPI.store.set('translationAbbr', translationAbbr);
   }, [translationAbbr]);
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydratedRef.current) return;
     void window.electronAPI.store.set('bookIndex', bookIndex);
   }, [bookIndex]);
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydratedRef.current) return;
     void window.electronAPI.store.set('chapterIndex', chapterIndex);
   }, [chapterIndex]);
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydratedRef.current) return;
     void window.electronAPI.store.set('parallelMode', parallelMode);
   }, [parallelMode]);
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydratedRef.current) return;
     void window.electronAPI.store.set('secondaryAbbr', secondaryAbbr);
   }, [secondaryAbbr]);
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydratedRef.current) return;
     void window.electronAPI.store.set('secondaryBookIndex', secondaryBookIndex);
   }, [secondaryBookIndex]);
   useEffect(() => {
-    if (!hydrated.current) return;
+    if (!hydratedRef.current) return;
     void window.electronAPI.store.set('secondaryChapterIndex', secondaryChapterIndex);
   }, [secondaryChapterIndex]);
 
@@ -218,6 +213,13 @@ export function BibleProvider({ children }: { children: React.ReactNode }) {
       setParallelMode, setSecondaryTranslation, setSecondaryPosition,
     ],
   );
+
+  // Hold the whole app back until position state is restored. This is one
+  // IPC round trip (catalog + settings in parallel), so the delay is a few
+  // ms - and it saves a full duplicate translation parse plus a
+  // wrong-then-right chapter flash that used to cost multi-hundred-ms
+  // main-process JSON.parses at startup.
+  if (!hydrated) return null;
 
   return <BibleContext.Provider value={value}>{children}</BibleContext.Provider>;
 }

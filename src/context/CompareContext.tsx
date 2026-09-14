@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useBible } from './BibleContext';
+import { loadAllSettings } from '../lib/settingsHydration';
 import type { CompareVerseEntry } from '../types/bible';
 import CompareVersions from '../components/CompareVersions';
 
@@ -38,12 +39,13 @@ export function CompareProvider({ children }: { children: React.ReactNode }): Re
   const requestIdRef = useRef<string | null>(null);
   const entriesRef = useRef<CompareVerseEntry[] | null>(null);
 
-  // Restore the chosen translation set from the persisted store (if any).
+  // Restore the chosen translation set from the shared store snapshot.
   useEffect(() => {
     let cancelled = false;
-    void window.electronAPI.store.get<string[]>('compareSelectedAbbrs').then((saved) => {
+    void loadAllSettings().then((all) => {
       if (cancelled) return;
-      if (Array.isArray(saved) && saved.length > 0) setCompareAbbrsState(saved);
+      const saved = all.compareSelectedAbbrs;
+      if (Array.isArray(saved) && (saved as string[]).length > 0) setCompareAbbrsState(saved as string[]);
       setSelectionLoaded(true);
     });
     return () => {

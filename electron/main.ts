@@ -264,6 +264,7 @@ function registerIpc(): void {
   });
 
   ipcMain.handle('store:get', (_event, key: string) => store.get(key));
+  ipcMain.handle('store:get-all', () => store.getAll());
   ipcMain.handle('store:set', (_event, payload: { key: string; value: unknown }) =>
     store.set(payload.key, payload.value),
   );
@@ -286,9 +287,18 @@ if (!gotLock) {
   app.whenReady().then(() => {
     registerIpc();
 
-    // Warm the worker pool in the background so the first verse comparison
-    // is already fast (translations parse once, then stay in memory).
-    setTimeout(() => bibleLoader.prewarmAll(), 1500);
+    createWindow();
+
+    // The renderer only needs tiny IPC reads (catalog/store) to paint the
+    // first chapter. Everything heavy - parsing the 4-9 MB translation JSONs -
+    // happens inside the worker pool, so we can safely start spawning those
+    // threads (and trickle the popular translations into memory) as soon as
+    // the window has loaded. The first chapter data is parsed by whichever
+    // worker owns that translation, off the main process.
+    mainWindow?.webContents.once('did-finish-load', () => {
+      bibleLoader.prepareWorkers();
+      bibleLoader.startBackgroundPrewarm();
+    });
 
     if (app.isPackaged) {
       // Strict CSP for the packaged build; Vite dev needs relaxed headers.
@@ -303,8 +313,6 @@ if (!gotLock) {
         });
       });
     }
-
-    createWindow();
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();

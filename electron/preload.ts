@@ -39,6 +39,7 @@ const api = {
   },
   store: {
     get: (key: string) => ipcRenderer.invoke('store:get', key),
+    getAll: () => ipcRenderer.invoke('store:get-all'),
     set: (key: string, value: unknown) => ipcRenderer.invoke('store:set', { key, value }),
   },
 };

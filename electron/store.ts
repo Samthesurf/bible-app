@@ -30,6 +30,12 @@ export class JsonStore {
     return this.data[key] as T | undefined;
   }
 
+  /** Whole settings object in one call (one IPC round trip for hydration). */
+  async getAll(): Promise<Record<string, unknown>> {
+    await this.ensureLoaded();
+    return { ...this.data };
+  }
+
   async set(key: string, value: unknown): Promise<void> {
     await this.ensureLoaded();
     this.data[key] = value;

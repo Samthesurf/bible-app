@@ -52,28 +52,61 @@ export interface CompareVerseEntry {
 
 export class BibleLoader {
   private readonly biblesPath: string;
-  /** LRU cache: at most 2 full translations in memory (~8-10 MB each). */
-  private readonly cache = new Map<string, BibleTranslation>();
-  private readonly MAX_CACHE = 2;
   private catalog: TranslationMeta[] | null = null;
-  /** Worker pool that owns long-lived parsed translations for comparisons. */
+  /** Worker pool that owns ALL parsed translations (chapters, compare, search). */
   private readonly workerPool: VerseWorkerPool;
+  private prewarmStarted = false;
+  private prewarmTimer: NodeJS.Timeout | null = null;
+  private disposed = false;
 
   constructor(biblesPath: string) {
     this.biblesPath = biblesPath;
     this.workerPool = new VerseWorkerPool(biblesPath);
   }
 
-  /** Pre-parse every translation into the worker pool in the background. */
-  prewarmAll(): void {
+  /** Spawn worker threads (no parsing yet). Cheap; call right after paint. */
+  prepareWorkers(): void {
+    this.workerPool.prepare();
+  }
+
+  /**
+   * Parse every translation into the worker pool as a background trickle.
+   * Popular translations go first so the common compares are instant within
+   * a second or two; the rest follow one at a time so disk/CPU never spike
+   * while the user is reading. Each translation is parsed exactly once
+   * (sticky worker routing), so the full set settles in ~10s with no jank.
+   */
+  startBackgroundPrewarm(): void {
+    if (this.prewarmStarted || this.disposed) return;
+    this.prewarmStarted = true;
     void this.getCatalog().then((catalog) => {
-      for (const t of catalog) this.workerPool.prewarm(t.abbr);
+      if (this.disposed) return;
+      const popular = ['KJV', 'NKJV', 'NIV', 'ESV', 'NLT', 'NASB', 'CSB', 'AMP', 'MSG', 'WEB'];
+      const rank = (abbr: string): number => {
+        const i = popular.indexOf(abbr);
+        return i === -1 ? popular.length : i;
+      };
+      const ordered = [...catalog].sort((a, b) => rank(a.abbr) - rank(b.abbr));
+      let next = 0;
+      const step = (): void => {
+        if (this.disposed) return;
+        this.workerPool.prewarm(ordered[next].abbr);
+        next += 1;
+        if (next < ordered.length) {
+          this.prewarmTimer = setTimeout(step, 150);
+        } else {
+          this.prewarmTimer = null;
+        }
+      };
+      this.prewarmTimer = setTimeout(step, 500);
     });
   }
 
   dispose(): void {
+    this.disposed = true;
+    if (this.prewarmTimer) clearTimeout(this.prewarmTimer);
+    this.prewarmTimer = null;
     this.workerPool.dispose();
-    this.cache.clear();
   }
 
   async getCatalog(): Promise<TranslationMeta[]> {
@@ -83,56 +116,19 @@ export class BibleLoader {
     return this.catalog;
   }
 
+  /** Book names + chapter counts, parsed in a worker (never on main). */
   async getBookList(abbr: string): Promise<BookMeta[]> {
-    const bible = await this.load(abbr);
-    return bible.books.map((b) => ({ name: b.name, chapterCount: b.chapters.length }));
+    return this.workerPool.getBookList(abbr);
   }
 
+  /** Full chapter data, parsed in a worker (never on main). */
   async getChapter(abbr: string, bookIndex: number, chapterIndex: number): Promise<ChapterData> {
-    const bible = await this.load(abbr);
-    if (bookIndex < 0 || bookIndex >= bible.books.length) {
-      throw new Error(`Book index ${bookIndex} out of range for ${abbr} (${bible.books.length} books)`);
-    }
-    const book = bible.books[bookIndex];
-    if (chapterIndex < 0 || chapterIndex >= book.chapters.length) {
-      throw new Error(`Chapter index ${chapterIndex} out of range for ${abbr} ${book.name}`);
-    }
-    return {
-      abbr,
-      bookName: book.name,
-      bookIndex,
-      chapterIndex,
-      chapterNumber: chapterIndex + 1,
-      totalChapters: book.chapters.length,
-      verses: book.chapters[chapterIndex],
-      copyright: bible.copyright,
-      translationName: bible.name,
-    };
+    return this.workerPool.getChapter(abbr, bookIndex, chapterIndex);
   }
 
+  /** Full-text search inside a worker (never on main). */
   async search(abbr: string, query: string, maxResults = 50): Promise<SearchResult[]> {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return [];
-    const bible = await this.load(abbr);
-    const results: SearchResult[] = [];
-    for (let b = 0; b < bible.books.length && results.length < maxResults; b += 1) {
-      const book = bible.books[b];
-      for (let c = 0; c < book.chapters.length && results.length < maxResults; c += 1) {
-        const chapter = book.chapters[c];
-        for (let v = 0; v < chapter.length && results.length < maxResults; v += 1) {
-          if (chapter[v].toLowerCase().includes(needle)) {
-            results.push({
-              bookIndex: b,
-              chapterIndex: c,
-              verseIndex: v,
-              reference: `${book.name} ${c + 1}:${v + 1}`,
-              text: chapter[v],
-            });
-          }
-        }
-      }
-    }
-    return results;
+    return this.workerPool.search(abbr, query, maxResults);
   }
 
   /**
@@ -179,23 +175,5 @@ export class BibleLoader {
       ),
     );
     return entries;
-  }
-
-  private async load(abbr: string): Promise<BibleTranslation> {
-    const cached = this.cache.get(abbr);
-    if (cached) {
-      // Refresh LRU position
-      this.cache.delete(abbr);
-      this.cache.set(abbr, cached);
-      return cached;
-    }
-    if (this.cache.size >= this.MAX_CACHE) {
-      const oldest = this.cache.keys().next().value;
-      if (oldest) this.cache.delete(oldest);
-    }
-    const raw = await fs.readFile(path.join(this.biblesPath, `${abbr}.json`), 'utf-8');
-    const data = JSON.parse(raw) as BibleTranslation;
-    this.cache.set(abbr, data);
-    return data;
   }
 }

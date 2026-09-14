@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { loadAllSettings } from '../lib/settingsHydration';
 
 export type Theme = 'light' | 'sepia' | 'dark';
 
@@ -36,17 +37,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [ttsSpeed, setTTSSpeedState] = useState(TTS_SPEED_DEFAULT);
   const hydrated = useRef(false);
 
-  // Restore settings
+  // Restore settings (one shared store:get-all round trip)
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([
-      window.electronAPI.store.get<Theme>('theme'),
-      window.electronAPI.store.get<number>('fontSize'),
-      window.electronAPI.store.get<number>('lineHeight'),
-      window.electronAPI.store.get<string>('ttsVoice'),
-      window.electronAPI.store.get<number>('ttsSpeed'),
-    ]).then(([t, fs, lh, voice, speed]) => {
+    void loadAllSettings().then((all) => {
       if (cancelled) return;
+      const t = all.theme as Theme | undefined;
+      const fs = all.fontSize as number | undefined;
+      const lh = all.lineHeight as number | undefined;
+      const voice = all.ttsVoice as string | undefined;
+      const speed = all.ttsSpeed as number | undefined;
       if (t === 'light' || t === 'sepia' || t === 'dark') setThemeState(t);
       if (typeof fs === 'number') setFontSizeState(fs);
       if (typeof lh === 'number') setLineHeightState(lh);
