@@ -15,6 +15,7 @@ extraResources:
   - from: electron/kokoro_service.py
     to: electron/kokoro_service.py
 linux:
+  artifactName: ${productName}.${ext}
   target:
     - AppImage
   category: Education
