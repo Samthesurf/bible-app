@@ -107,10 +107,10 @@ export const SplitChaptersIcon = ({ size, className }: IconProps) => (
 /** Compare-across-versions icon (two rows of text against a scale). */
 export const CompareIcon = ({ size, className }: IconProps) => (
   <svg {...base(size, className)}>
-    <path d="m16 3 5 5-5 5" />
-    <path d="M21 8H9" />
-    <path d="m8 13-5 5 5 5" />
-    <path d="M3 18h12" />
+    <path d="m16 2 5 5-5 5" />
+    <path d="M21 7H9" />
+    <path d="m8 12-5 5 5 5" />
+    <path d="M3 17h12" />
   </svg>
 );
 
