@@ -1,0 +1,13 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "bible-app",
+  "outputfilename": "bible-app-wails",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build:renderer",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Samuel Ukpai",
+    "email": "ukpsamuel67@gmail.com"
+  }
+}
