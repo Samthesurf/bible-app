@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Bible App (Go)
+Comment=Offline desktop Bible reader
+Exec=/home/samuelsurf/Documents/JS_stuff/bible_app/build/bin/bible-app-wails
+Icon=/home/samuelsurf/Documents/JS_stuff/bible_app/build/icon.png
+Terminal=false
+Type=Application
+Categories=Education;
+StartupWMClass=bible-app-wails

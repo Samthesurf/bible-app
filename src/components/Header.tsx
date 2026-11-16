@@ -1,6 +1,7 @@
 import React from 'react';
 import { UserIcon } from './Icons';
 import SearchBar from './SearchBar';
+import logoUrl from '../assets/logo-64.png';
 import './Header.css';
 
 const TABS = [
@@ -14,7 +15,7 @@ export default function Header(): React.ReactElement {
       <div className="header__left">
         <div className="header__logo">
           <span className="header__logo-icon">
-            <img src="logo.png" alt="" width={32} height={32} />
+            <img src={logoUrl} alt="" width={32} height={32} />
           </span>
           <span className="header__logo-text">Bible App</span>
         </div>

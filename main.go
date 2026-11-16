@@ -4,12 +4,18 @@ import (
 	"embed"
 
 	"github.com/wailsapp/wails/v2"
+
 	"github.com/wailsapp/wails/v2/pkg/options"
+
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/linux"
 )
 
 //go:embed all:dist
 var assets embed.FS
+
+//go:embed build/icon.png
+var windowIcon []byte
 
 func main() {
 	app := NewApp()
@@ -26,6 +32,11 @@ func main() {
 		},
 		AssetServer: &assetserver.Options{
 			Assets: assets,
+		},
+		Linux: &linux.Options{
+			Icon:             windowIcon,
+			ProgramName:      "bible-app-wails",
+			WebviewGpuPolicy: linux.WebviewGpuPolicyNever,
 		},
 		OnStartup:  app.Startup,
 		OnShutdown: app.Shutdown,
